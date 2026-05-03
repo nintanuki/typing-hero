@@ -817,3 +817,148 @@ The in-use set is built at the call site (`{alien.word for alien in aliens}`) so
      pool-exhaustion silent no-op.]
 **Why:** Same pattern as TODO — flip "(not yet built)" to ✅ and harden hedged checks into definite ones. Three new bullets that didn't exist in the pre-stage version: the first-frame spawn check (regression hook for the "kick the first tick" call in main.py — easy to forget on a future rewrite), the shared-first-letter tie-break check (Stage 3 wrote the tie-break code but Stage 4 is the first stage that actually exercises it from random spawning), and the pool-exhaustion silent-no-op check (so the "every word on screen" edge case is verifiable from this file alone).
 **Editor:** Claude Opus 4.7 via Cowork
+
+## 2026-05-03 15:45 UTC — Stage 5 (aliens fall + miss mechanic)
+
+Stage 5 of the build plan lands: aliens now descend each frame at `AlienSettings.SPEED` and trigger a miss when their top edge clears the bottom of the screen. The miss path is a bare `print("miss")` for now — hearts + game-over land in Stage 6. The Stage 3 typing state machine and the Stage 4 spawn loop are unchanged; the only new motion is downward and the only new state-mutation is the lock-clear-on-target-missed branch in `main.py`.
+
+**File:** settings.py
+**Date and Time:** 2026-05-03 15:45 UTC
+**Lines (at time of edit):** 148-188 (new `AlienSettings` class inserted between `SpawnSettings` and `TypingSettings`)
+**Before:**
+    class SpawnSettings:
+        ...
+        COLORS = ('red', 'green', 'yellow', 'blue')
+
+
+    class TypingSettings:
+        ...
+**After:**
+    class SpawnSettings:
+        ...
+        COLORS = ('red', 'green', 'yellow', 'blue')
+
+
+    class AlienSettings:
+        """Tunables for alien behavior once on screen (Stage 5+)."""
+
+        SPEED = 0.5
+        # Per-color SPEED band lives in Stage 7 (TODO Q6) alongside POINTS:
+        #     SPEED = {'red': 0.5, 'green': 0.7, 'yellow': 0.9, 'blue': 1.1}
+
+
+    class TypingSettings:
+        ...
+**Why:** TODO Stage 5 step 1 + Refactoring Rule "no magic numbers." `AlienSettings` is a new class because alien-on-screen behavior (descent speed, eventual frame-cycle animation rate, point values) is a distinct concern from how aliens *spawn* (which already has its own `SpawnSettings`). `SPEED = 0.5` translates the §5 hint of "1 px/frame at 60 FPS" to this project's 120 FPS — verified by a pure-Python simulation of the float accumulator: an alien spawned at `SPAWN_Y = 80` traverses the screen in ~12.5 s, comfortably in the §6 "8–10 s window" once you account for the alien sprite extending ~30 px below `rect.top`. Stored as a float (not an int) because the sub-pixel value matters: `Alien.position` is a Vector2, and an int rect can't track 0.5 px per frame without rounding artifacts. **Per-color SPEED dict deferred** to Stage 7 alongside POINTS, with the legacy-style shape kept as a comment so the future port has a target. Single-value uniform speed today is the right call for Stage 5 because aliens are otherwise indistinguishable in motion (no zigzag, no confusion) — color-as-difficulty needs to land *together* with color-as-points so the harder-color = higher-reward contract is wired up in one pass, not staggered across two stages where blue would briefly be just-as-easy as red.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** core/sprites.py
+**Date and Time:** 2026-05-03 15:45 UTC
+**Lines (at time of edit):** 16 (import line) + 53-88 (new `position` attribute and `update` method)
+**Before:**
+    from settings import AssetPaths, WordSettings
+
+    class Alien(pygame.sprite.Sprite):
+        def __init__(self, color, pos, word):
+            super().__init__()
+            self.color = color
+            self.word = word
+            sprite_path = os.path.join(AssetPaths.GRAPHICS_DIR, f'{color}1.png')
+            self.image = pygame.image.load(sprite_path).convert_alpha()
+            self.rect = self.image.get_rect(center=pos)
+
+        def draw_word(self, surface, font, prefix_length=0):
+            ...
+**After:**
+    from settings import AlienSettings, AssetPaths, WordSettings
+
+    class Alien(pygame.sprite.Sprite):
+        def __init__(self, color, pos, word):
+            super().__init__()
+            self.color = color
+            self.word = word
+            sprite_path = os.path.join(AssetPaths.GRAPHICS_DIR, f'{color}1.png')
+            self.image = pygame.image.load(sprite_path).convert_alpha()
+            self.rect = self.image.get_rect(center=pos)
+            # Stage 5: float position accumulator for sub-pixel SPEED.
+            self.position = pygame.math.Vector2(self.rect.topleft)
+
+        def update(self):
+            """Advance one frame of motion."""
+            self.position.y += AlienSettings.SPEED
+            self.rect.y = round(self.position.y)
+
+        def draw_word(self, surface, font, prefix_length=0):
+            ...
+**Why:** TODO Stage 5 step 1. The smallest possible slice of the legacy `Alien.calculate_movement` (~30 lines, branching on color for zigzag/confusion-stall) collapsed to a 2-line `update` — Typing Hero aliens never move horizontally (§2 of TODO: "aliens threaten by reaching the bottom"), and the blue confusion attack is deferred to v2 (Q9). The legacy `apply_movement(dx, dy)` helper folds away because there's only one motion direction to apply. `pygame.math.Vector2` is added on the sprite because adding a sub-pixel `0.5` to an int `rect.y` every frame would oscillate between 0 px and 1 px deltas depending on rounding direction — the float accumulator gives the smooth 0/1/1/0/0/1 deltas that read as steady descent at 120 FPS (verified by simulation). `round()` (vs `int()`) keeps the half-pixel rounding honest at the boundary so the alien drops 1 px every 2 frames on average instead of always flooring to 0. **`update` does the motion only — not the off-screen kill**: putting the kill here would force `Alien` to know about `WordManager` (so it could clear the lock if it was the targeted alien), which the package layout deliberately avoids. The miss path stays in `main.py` where both the alien group and the word manager are in scope. Docstring calls out Stage 7's eventual world-speed multiplier and Stage 8's frame-cycle animation as the two `update`-extending concerns so the future port has somewhere to dock without rethinking the structure.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** main.py
+**Date and Time:** 2026-05-03 15:45 UTC
+**Lines (at time of edit):** module docstring rewritten; new `aliens.update()` + miss-scan block inserted before the render pass (lines 111-134)
+**Before:**
+    """Typing Hero entry point. Stage 4 scaffold..."""
+    [event pump]
+    screen.fill(ScreenSettings.BG_COLOR)
+    aliens.draw(screen)
+    for alien in aliens:
+        ...
+**After:**
+    """Typing Hero entry point. Stage 5 scaffold..."""
+    [event pump unchanged]
+    aliens.update()  # Stage 5: advance one frame of vertical motion.
+    for alien in list(aliens):
+        if alien.rect.top > ScreenSettings.HEIGHT:
+            if alien is word_manager.targeted_alien:
+                word_manager.clear_lock()
+            alien.kill()
+            print("miss")
+    screen.fill(ScreenSettings.BG_COLOR)
+    aliens.draw(screen)
+    for alien in aliens:
+        ...
+**Why:** TODO Stage 5 steps 2 + 3. Notes:
+ * **`aliens.update()` lives between event pump and render** so an alien that crosses the bottom this frame is caught and missed on the same frame it would otherwise first render off-screen. Render-then-update would draw the missed alien one extra frame past the screen edge.
+ * **`list(aliens)` snapshot before iteration** — `alien.kill()` mutates the underlying group, which would otherwise corrupt the iterator. Same pattern Stage 2 used for the Enter-kill loop.
+ * **`rect.top > HEIGHT` (not `rect.bottom > HEIGHT`)** matches the TODO §5 step 2 spec exactly: the alien has *fully* cleared the bottom edge before the miss fires. The cushion gives a player who finishes typing the word at the very last frame the kill instead of a miss.
+ * **Lock-clear runs *before* `alien.kill()`** so `WordManager.targeted_alien` is never holding a reference to a sprite that's been removed from its group. Identity check (`is`, not `==`) so two aliens that happen to share a word wouldn't both clear the lock when only one of them falls.
+ * **`print("miss")` is the placeholder miss callback** — Stage 6 lifts this into a `hearts -= 1` against a counter and a "GAME OVER" branch. Keeping it a `print` here matches the TODO step 4 smoke test and avoids pre-wiring Stage 6 state that doesn't have a home yet.
+ * **The `for alien in aliens: alien.draw_word(...)` block stays unchanged** — the spawn loop, the typing state machine, and the targeted-alien identity check (`if alien is word_manager.targeted_alien`) all keep working without modification because the lock-clear branch ensures `targeted_alien` is `None` whenever the previously-targeted sprite has been removed.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** docs/TODO.md
+**Date and Time:** 2026-05-03 15:45 UTC
+**Lines (at time of edit):** Stage 5 heading + 4 step boxes + four new resolution paragraphs
+**Before:**
+    ### Stage 5 — Aliens fall + miss mechanic
+    [4 unchecked step boxes]
+**After:**
+    ### Stage 5 — Aliens fall + miss mechanic ✅
+    [4 checked step boxes]
+    **Resolution this stage:** Alien.update() is vertical-only,
+    miss callback inlined in main.py (Alien doesn't know
+    about WordManager), order is lock-clear → kill → print...
+    **SPEED chosen, color-bands deferred** to Stage 7 (Q6)...
+    **SPAWN_Y stays at 80** (visible top band), not pushed
+    negative as the Stage 4 entry hinted — word readability...
+    **Alien.update() is its own function**, not folded into
+    draw_word, per the Refactoring Rule on update being thin...
+**Why:** Same convention as Stage 0/1/2/3/4 entries — flip checkboxes, add ✅ to the heading, replace the "open question / next-stage hint" sketch with a "what we actually decided / what we built" set of paragraphs so a future session reading the TODO cold sees the resolutions inline. The four sub-paragraphs cover the four meaningfully separate decisions of this stage: where the miss-callback lives, what SPEED value to start with (and which color-band knob got deferred), whether to push SPAWN_Y above the screen as the Stage 4 entry promised (no — word readability won), and why `update` is its own method.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** docs/TESTING.md
+**Date and Time:** 2026-05-03 15:45 UTC
+**Lines (at time of edit):** 52-58 (Stage 5 section)
+**Before:**
+    ## Stage 5 — Falling + miss (not yet built)
+    [4 generic bullets covering descent, off-screen miss, lock clear]
+**After:**
+    ## Stage 5 — Falling + miss ✅
+    [7 specific bullets — smooth descent (no rounding stutter from
+     the sub-pixel accumulator), ~12 s screen traversal, miss logged
+     and sprite removed on rect.top > HEIGHT, targeted-alien fall
+     clears the lock, untargeted-alien fall preserves the lock
+     (regression hook for the identity check), SPAWN_Y still leaves
+     spawned aliens fully visible.]
+**Why:** Same pattern as TODO — flip "(not yet built)" to ✅ and harden hedged checks into definite ones. Three new bullets the pre-stage version didn't have: the smoothness check (regression hook for the float position — if a future change collapses Vector2 back to int rect, this will fail visibly), the untargeted-alien-preserves-lock check (regression hook for the `is` identity branch — easy to break by accidentally clearing on every miss), and the SPAWN_Y-still-visible check (regression hook for the §5 decision to *not* push spawn_y negative; a future session re-reading the Stage 4 hint might "fix" it back to negative without realizing word readability was the reason).
+**Editor:** Claude Opus 4.7 via Cowork

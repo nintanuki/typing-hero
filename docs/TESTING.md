@@ -49,12 +49,15 @@ Run the relevant section after every change. Each stage in [`TODO.md`](TODO.md) 
 * Two aliens whose words happen to start with the same letter still resolve correctly: pressing that letter locks onto the lower one (lowest-y tie-break from Stage 3)
 * If every word in the list happens to be on screen at once, the next spawn tick is a silent no-op rather than a crash or duplicate
 
-## Stage 5 — Falling + miss (not yet built)
+## Stage 5 — Falling + miss ✅
 
 * All previous checks still pass
-* Aliens drift downward at the configured speed
-* Crossing the bottom of the screen logs a miss and removes the alien
-* Missing the *targeted* alien clears the active prefix lock
+* Aliens drift downward smoothly at `AlienSettings.SPEED` (no visible stutter — the float `Alien.position` accumulator means SPEED=0.5 advances rect.y by 1 px every other frame on average, not by 0/1 alternating in a jittery pattern)
+* Each spawned alien takes roughly 12 s to traverse from spawn band to bottom edge (slow enough to read and type comfortably; tune in Stage 6 once misses cost a heart)
+* When an alien's top edge crosses below `ScreenSettings.HEIGHT` the console logs `miss` and the sprite is removed (no lingering off-screen corpses)
+* If the alien that just fell off was the active typing target, the prefix lock clears and the bottom-of-screen typing buffer empties — the next letter the player presses re-acquires from scratch
+* If a *non-targeted* alien falls off, the active lock is undisturbed (verifiable by typing partway into one alien's word, then letting an unrelated alien fall: the cyan/white split on the locked alien stays exactly as it was)
+* Aliens still spawn at `SpawnSettings.SPAWN_Y = 80` so the word floating above is fully on-screen from the moment of spawn (Stage 4 first-frame-spawn check still passes)
 
 ## Stage 6 — Hearts + game over (not yet built)
 

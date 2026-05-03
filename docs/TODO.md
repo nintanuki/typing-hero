@@ -227,15 +227,23 @@ Each stage is small enough to finish, run, and *see something change* in one sit
 
 **`Stage3Layout` deleted** as planned in the Stage 3 entry. **First-frame spawn** is called once after `SpawnDirector()` so the screen isn't blank for the first 3000 ms after boot — the timer still drives every subsequent spawn. **Pool exhaustion is a silent no-op** in `pick_word` (returns `None`) rather than a crash; the director skips that tick and the next on-screen completion frees a word naturally.
 
-### Stage 5 — Aliens fall + miss mechanic
+### Stage 5 — Aliens fall + miss mechanic ✅
 **Goal:** Aliens drift downward. Reaching the bottom edge counts as a miss (just print "miss" for now).
 
 **Steps:**
 
-- [ ] 1. Port the alien movement loop from `legacy/core/sprites.py` `Alien.calculate_movement` — vertical-only for now, slow speed (start with `1` px/frame at 60 FPS, tune later).
-- [ ] 2. When `alien.rect.top > ScreenSettings.HEIGHT`, trigger a miss callback and `alien.kill()`.
-- [ ] 3. If the killed alien was the active target, clear the lock.
-- [ ] 4. Smoke test: aliens fall slowly, untyped aliens disappear off the bottom and print a miss.
+- [x] 1. Port the alien movement loop from `legacy/core/sprites.py` `Alien.calculate_movement` — vertical-only for now, slow speed (start with `1` px/frame at 60 FPS, tune later).
+- [x] 2. When `alien.rect.top > ScreenSettings.HEIGHT`, trigger a miss callback and `alien.kill()`.
+- [x] 3. If the killed alien was the active target, clear the lock.
+- [x] 4. Smoke test: aliens fall slowly, untyped aliens disappear off the bottom and print a miss.
+
+**Resolution this stage:** ported the smallest possible slice of `Alien.calculate_movement` — vertical-only, no zigzag, no confusion-stall — into a new `Alien.update()` that does just `self.position.y += AlienSettings.SPEED; self.rect.y = round(self.position.y)`. The legacy `apply_movement(dx, dy)` helper is collapsed into the one motion that matters here (Typing Hero aliens never move horizontally per §2). `pygame.math.Vector2` is added on the sprite so the sub-pixel `SPEED = 0.5` actually accumulates — adding 0.5 to an int rect every frame would oscillate between 0 and 1 px deltas depending on rounding direction; the float accumulator gives the smooth 0/1/1/0/0/1 pattern that reads as steady descent at 120 FPS. The miss callback is **inlined in `main.py`** rather than passed to the Alien — `Alien.update()` doesn't know about `WordManager`, and putting the kill in the sprite would force that coupling. Order in the miss block: lock-clear (if the missed alien was the target) → `alien.kill()` → `print("miss")` so `WordManager` is never holding a dead reference between frames.
+
+**SPEED chosen, color-bands deferred.** `AlienSettings.SPEED = 0.5` is uniform across all four colors — the §5 step 1 hint of "1 px/frame at 60 FPS" translates to 0.5 px/frame at this project's 120 FPS. Per-color bands (red slow, blue fast — Q6's color-as-difficulty tie-in) are deferred to Stage 7 alongside `POINTS` so the harder-color = higher-reward contract lands in one pass. Time-to-miss at SPEED=0.5 from `SPAWN_Y = 80` is ~12.5 seconds (verified by a pure-Python simulation of the float accumulator, no pygame), which is on the slow side of §6's "8–10 s window" but a fine starting point — Stage 6's tuning checkpoint after hearts land is the right place to tighten it once a miss actually costs something.
+
+**`SPAWN_Y` stays at 80 (visible top band), not pushed negative as the Stage 4 entry hinted.** The original plan was to flip it negative so aliens "fall *into* the screen," but the word floating above an alien is a key gameplay element — spawning the sprite with its top at y=0 means the word above it is *off-screen*, and the player can't read what to type until the alien has fallen far enough for the word to clear y=0. With Stage 5's slow descent that takes a few seconds, which feels worse than just spawning visibly. So aliens spawn fully readable at y=80 and have ~12 s to be typed before they cross the bottom. The Stage 4 first-frame-spawn behavior also keeps working unchanged.
+
+**`Alien.update()` is its own function, not folded into `draw_word`.** Per the Refactoring Rule "Keep functions organized and grouped by role; the `update` and `run` functions ... do as little as possible — only call other functions if possible." Stage 5's `update` is a 2-liner today; Stages 7 (difficulty multiplier) and 8 (frame-cycle animation) will grow it by adding more *calls*, not more inline logic.
 
 ### Stage 6 — Hearts + game over
 **Goal:** Hearts HUD in top-right. Each miss removes one. Zero hearts → game over screen → restart.

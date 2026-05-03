@@ -13,7 +13,7 @@ import os
 
 import pygame
 
-from settings import AssetPaths, WordSettings
+from settings import AlienSettings, AssetPaths, WordSettings
 
 
 class Alien(pygame.sprite.Sprite):
@@ -49,6 +49,43 @@ class Alien(pygame.sprite.Sprite):
         sprite_path = os.path.join(AssetPaths.GRAPHICS_DIR, f'{color}1.png')
         self.image = pygame.image.load(sprite_path).convert_alpha()
         self.rect = self.image.get_rect(center=pos)
+
+        # Stage 5: store position as a Vector2 (not just rect.x/y)
+        # because ``AlienSettings.SPEED`` is sub-pixel — adding 0.5 to
+        # an int rect every frame would alternate between "move 0" and
+        # "move 1" depending on rounding direction, which reads as
+        # stutter. Float position accumulates honestly; rect is a
+        # rounded mirror updated in ``update``. Mirrors the legacy
+        # ``apply_movement`` pattern in ``legacy/core/sprites.py``.
+        self.position = pygame.math.Vector2(self.rect.topleft)
+
+    def update(self):
+        """Advance one frame of motion.
+
+        Stage 5: vertical-only descent at ``AlienSettings.SPEED`` px
+        per frame. The legacy ``Alien.calculate_movement`` branched on
+        color for zigzag (yellow / blue) and stalled mid-descent for
+        the blue confusion attack; Typing Hero cuts both — aliens
+        threaten by *reaching the bottom* (``§2`` of ``docs/TODO.md``),
+        so the only motion that matters is "down." Per-color speed
+        bands and the eventual world-speed multiplier from Stage 7's
+        difficulty ramp will land here too.
+
+        Off-screen detection is intentionally *not* done in this
+        method — the main loop owns the miss callback so it can also
+        clear the typing lock if the targeted alien is the one that
+        just fell. Putting the kill here would force ``Alien`` to know
+        about ``WordManager``, which the package layout deliberately
+        avoids.
+
+        Returns:
+            None. Mutates ``self.position`` and ``self.rect``.
+        """
+        self.position.y += AlienSettings.SPEED
+        # ``round`` (vs ``int``) keeps the rect honest at the half-
+        # pixel boundary — at SPEED=0.5 the alien drops 1 px every two
+        # frames rather than oscillating between flooring and ceiling.
+        self.rect.y = round(self.position.y)
 
     def draw_word(self, surface, font, prefix_length=0):
         """Render ``self.word`` horizontally centered above the sprite.

@@ -145,6 +145,38 @@ class SpawnSettings:
     COLORS = ('red', 'green', 'yellow', 'blue')
 
 
+class AlienSettings:
+    """Tunables for alien behavior once on screen (Stage 5+).
+
+    Stage 5 introduces vertical-only descent — no zigzag, no confusion
+    beam, no per-color motion variation. The legacy ``AlienSettings``
+    in ``legacy/settings.py`` carried per-color SPEED, ZIGZAG_THRESHOLD,
+    POINTS, drop-table chances, and a confusion-attack tunable block;
+    those land (or stay cut) in their own stages — POINTS in Stage 7,
+    per-color SPEED bands also in Stage 7 alongside Q6's color-as-
+    difficulty work, drops/confusion deferred indefinitely (§2 cuts).
+    """
+
+    # Pixels per frame an alien drops, applied uniformly to all four
+    # colors at Stage 5. ``docs/TODO.md`` §5 step 1 calls for "1 px/
+    # frame at 60 FPS, tune later"; this project runs at 120 FPS, so
+    # the equivalent is 0.5 px/frame. With ``SpawnSettings.SPAWN_Y =
+    # 80`` and ``ScreenSettings.HEIGHT = 800``, an alien takes roughly
+    # (800 - 80) / 0.5 / 120 ≈ 12 s to traverse the screen — squarely
+    # in the §6 pitfall's "8–10 s window" once we account for the
+    # alien sprite extending below ``rect.top``. Stored as a float so
+    # the sub-pixel accumulator on ``Alien.position`` actually advances
+    # each frame; integer 1 (or rounding the multiply) would either
+    # double the speed or stall it depending on the path.
+    SPEED = 0.5
+    # Per-color SPEED band lives in Stage 7 (``docs/TODO.md`` Q6)
+    # alongside POINTS — both are about color-as-difficulty and want
+    # to land together so the harder-color = higher-reward contract
+    # is wired up in one pass. Pattern from the legacy class kept as
+    # a comment so the future port has a target shape:
+    #     SPEED = {'red': 0.5, 'green': 0.7, 'yellow': 0.9, 'blue': 1.1}
+
+
 class TypingSettings:
     """Tunables for capturing player typing and rendering the typing buffer.
 

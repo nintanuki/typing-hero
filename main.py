@@ -1,15 +1,19 @@
 """Typing Hero entry point.
 
-Stage 4 scaffold: the three hand-placed Stage 3 demo aliens are gone.
-A ``SpawnDirector`` now owns a pygame timer event that ticks every
-``SpawnSettings.SPAWN_RATE`` ms and pushes a fresh alien onto the
-screen at a random x near the top, carrying a random word from
-``assets/words.txt`` that no on-screen alien is currently using. The
-typing state machine from Stage 3 (``WordManager``: prefix-lock onto
-the first matching alien on the lowest-y tie-break, two-color word
-render, Enter to commit, Backspace to shrink) still drives the kill
-loop. Falling motion, miss counting, the laser visual, audio, and
-hearts all land in later stages.
+Stage 5 scaffold: aliens now *fall*. Each frame, ``aliens.update()``
+advances every alien down the screen by ``AlienSettings.SPEED``
+(sub-pixel accurate via the new ``Alien.position`` Vector2). After
+the update pass, the main loop scans for any alien whose top edge
+has cleared the bottom of the screen, prints ``miss`` to the console,
+clears the typing lock if the missed alien was the active target, and
+removes the sprite. Hearts / game-over land in Stage 6 — Stage 5
+just establishes the miss signal.
+
+The Stage 4 spawning loop (``SpawnDirector`` + timer + first-frame
+spawn) is unchanged; the Stage 3 typing state machine (``WordManager``
+with prefix-lock, two-color word render, Enter/Backspace) is also
+unchanged. Laser visual + audio + the hearts HUD all land in later
+stages.
 
 ESC and the OS close button still quit the window cleanly. All text
 that reaches the screen is rendered uppercase per the project-wide
@@ -103,6 +107,31 @@ def run() -> None:
                     # lives here at the input boundary.
                     if word_manager.prefix_length < TypingSettings.MAX_LENGTH:
                         word_manager.handle_letter(event.unicode, aliens)
+
+        # Stage 5: advance every alien one frame of vertical motion
+        # before the render pass. Group.update() forwards to each
+        # sprite's update(), which mutates rect.y from the float
+        # position accumulator on Alien. Done before the off-screen
+        # scan so an alien that crosses the bottom this frame is
+        # caught (and missed) on the same frame it would have first
+        # rendered fully off-screen.
+        aliens.update()
+
+        # Stage 5: miss detection. Iterate a snapshot of the group
+        # (``list(aliens)``) because alien.kill() mutates the group
+        # mid-iteration. ``rect.top > HEIGHT`` is the "fully past the
+        # bottom edge" condition from TODO §5 step 2 — we wait until
+        # the whole sprite has cleared the screen so a player who
+        # finishes typing the word at the very last frame still gets
+        # the kill, not a miss. Lock-clear runs before kill() so the
+        # WordManager is never left holding a dead reference (it
+        # checks identity in handle_letter / draw paths).
+        for alien in list(aliens):
+            if alien.rect.top > ScreenSettings.HEIGHT:
+                if alien is word_manager.targeted_alien:
+                    word_manager.clear_lock()
+                alien.kill()
+                print("miss")
 
         screen.fill(ScreenSettings.BG_COLOR)
         aliens.draw(screen)
