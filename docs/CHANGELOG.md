@@ -100,3 +100,120 @@ Frankie has decided to transform the Star Hero codebase into Typing Hero, a typi
      not imported here. This entry is the first.]
 **Why:** Typing Hero is a fresh project, not a continuation of Star Hero — the entry log starts over. Star Hero's format/conventions are kept because they were carefully designed (ISO 8601 sortability, per-file timestamps for multi-file changes, append-only history) and they apply to any project. The "Dungeon Digger" leftover is fixed in passing.
 **Editor:** Claude Opus 4.7 via Cowork
+
+## 2026-05-03 05:39 UTC — Stage 0 scaffold (empty pygame window)
+
+First code lands in Typing Hero. This entry covers Stage 0 of the build plan in `docs/TODO.md`: copy assets out of `legacy/`, create the empty subpackage skeleton, write a stripped `settings.py`, and write a `main.py` that opens a 600×800 pygame window titled "Typing Hero" and exits cleanly on QUIT or ESC.
+
+**File:** assets/
+**Date and Time:** 2026-05-03 05:39 UTC
+**Lines (at time of edit):** (new directory tree, copied verbatim from legacy/assets/)
+**Before:**
+    (did not exist at repo root)
+**After:**
+    assets/audio/    (12 .ogg SFX files + attributions.md)
+    assets/font/     (Pixeled.ttf)
+    assets/graphics/ (background, explosion, heart, player_ship, tv, red1/2, green1/2, yellow1/2, blue1, attributions.md)
+    assets/music/    (game_over.ogg, star_hero.ogg, star_hero_intro.ogg, attributions.md)
+**Why:** TODO Stage 0 step 1. Settings paths (`AssetPaths`, `AudioSettings.MUSIC_DIR`, `FontSettings.FONT`) all resolve relative to the repo root, so the copy is required before `settings.py` can import without raising. The `legacy/assets/` copy stays in place under `legacy/` so the read-only reference is unaffected.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** core/__init__.py
+**Date and Time:** 2026-05-03 05:39 UTC
+**Lines (at time of edit):** (new file, empty)
+**Before:**
+    (file did not exist)
+**After:**
+    (empty)
+**Why:** TODO Stage 0 step 2. Marks `core/` as a package so Stage 1 can place `core/sprites.py` and have `from core.sprites import Alien` work without relative-import gymnastics.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** systems/__init__.py
+**Date and Time:** 2026-05-03 05:39 UTC
+**Lines (at time of edit):** (new file, empty)
+**Before:**
+    (file did not exist)
+**After:**
+    (empty)
+**Why:** TODO Stage 0 step 2. Marks `systems/` as a package for the future `WordManager`, `SpawnDirector`, `ScoreManager`, and `Audio` modules ported from legacy.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** ui/__init__.py
+**Date and Time:** 2026-05-03 05:39 UTC
+**Lines (at time of edit):** (new file, empty)
+**Before:**
+    (file did not exist)
+**After:**
+    (empty)
+**Why:** TODO Stage 0 step 2. Marks `ui/` as a package for the future hearts HUD, intro/game-over screens, and CRT overlay.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** settings.py
+**Date and Time:** 2026-05-03 05:39 UTC
+**Lines (at time of edit):** 1-72 (new file)
+**Before:**
+    (file did not exist)
+**After:**
+    """Project-wide tunable constants for Typing Hero..."""
+    import os
+
+    class ColorSettings:
+        COLORS = { 'RED': (255, 80, 80), 'GREEN': (60, 255, 100),
+                   'YELLOW': (255, 220, 60), 'BLUE': (80, 160, 255),
+                   'WHITE': (255, 255, 255), 'CYAN': (80, 255, 255),
+                   'BLACK': (0, 0, 0) }
+
+    class ScreenSettings:
+        WIDTH = 600; HEIGHT = 800; RESOLUTION = (WIDTH, HEIGHT)
+        CENTER = (WIDTH/2, HEIGHT/2); FPS = 120
+        BG_COLOR = ColorSettings.COLORS['BLACK']
+        TITLE = "Typing Hero"
+
+    class FontSettings:
+        FONT = os.path.join(os.path.dirname(__file__),
+                            'assets', 'font', 'Pixeled.ttf')
+        SMALL = 10; MEDIUM = 20; LARGE = 30; COLOR = 'white'
+
+    class AudioSettings:
+        DEFAULT_MASTER_VOLUME = 0.5; DEBUG_MUTE = False
+        BASE_DIR / ASSETS_DIR / MUSIC_DIR / AUDIO_DIR
+
+    class AssetPaths:
+        BASE_DIR / ASSETS_DIR / GRAPHICS_DIR
+        BACKGROUND, EXPLOSION, PLAYER, HEART, TV
+**Why:** TODO Stage 0 step 3 calls for a "stripped settings.py containing only ColorSettings, ScreenSettings, FontSettings, AudioSettings, AssetPaths. No game-mechanic constants yet." Dropped from the legacy version: PlayerSettings, ControllerSettings, AlienSettings, LaserSettings, PowerupSettings, BombSettings, ExplosionSettings, UISettings — every class that encodes shooter-specific or HUD-specific tuning that has not yet been ported. Within the kept classes, also dropped CRT_*, BG_SCROLL_*, DEFAULT_BG_SCROLL_SPEED (no scrolling background in Stage 0), AudioSettings.INTRO_VOL_BOOST and BGM_PLAYLIST (no audio system yet), and FontSettings.DEFAULT_INITIALS (no leaderboard yet). All constants currently retained are needed to open the window or are paths that future stages will already expect to find.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** main.py
+**Date and Time:** 2026-05-03 05:39 UTC
+**Lines (at time of edit):** 1-40 (new file)
+**Before:**
+    (file did not exist)
+**After:**
+    """Typing Hero entry point. Stage 0 scaffold..."""
+    import sys
+    import pygame
+    from settings import ScreenSettings
+
+    def run() -> None:
+        pygame.init()
+        screen = pygame.display.set_mode(ScreenSettings.RESOLUTION)
+        pygame.display.set_caption(ScreenSettings.TITLE)
+        clock = pygame.time.Clock()
+        running = True
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    running = False
+            screen.fill(ScreenSettings.BG_COLOR)
+            pygame.display.flip()
+            clock.tick(ScreenSettings.FPS)
+        pygame.quit()
+
+    if __name__ == "__main__":
+        run()
+        sys.exit(0)
+**Why:** TODO Stage 0 step 4. Smallest possible main loop — open display, pump events, fill screen, flip, tick. Deliberately not ported from `legacy/main.py` (which is full of shooter-specific event handlers); the new `main.py` will grow stage-by-stage rather than start from a bloated copy. ESC quits the window cleanly here, matching the Stage 0 smoke test in `docs/TESTING.md`; this differs from legacy where ESC was a hard process kill — the gentler behavior is what Stage 9's pause work is going to want anyway.
+**Editor:** Claude Opus 4.7 via Cowork
