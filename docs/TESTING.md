@@ -1,25 +1,113 @@
 # Testing Checklist
 
-Run this after major changes to ensure nothing broke:
+Run the relevant section after every change. Each stage in [`TODO.md`](TODO.md) ends with a smoke test that gets added here once the stage lands. Earlier stages stay in the list — anything that *was* working should *still* be working.
 
-* Start game successfully
+## Stage 0 — Scaffold (not yet built)
+
+* `python main.py` opens a 600×800 window titled "Typing Hero"
+* Window background is solid black (no errors blitting nothing)
+* `ESC` closes the window cleanly
+* Closing the window via the OS chrome closes the process cleanly
+* No tracebacks on startup or shutdown
+
+## Stage 1 — One alien, one word (not yet built)
+
+* All Stage 0 checks still pass
+* A single alien sprite is visible at center-screen
+* The word "hello" is rendered above the alien in the Pixeled font
+* Sprite and text remain visible across multiple frames (no flicker)
+
+## Stage 2 — Type to destroy (not yet built)
+
+* All previous checks still pass
+* Letter keystrokes are echoed to a debug area on screen
+* Typing the alien's word + `Enter` removes the alien
+* Typing a wrong word + `Enter` clears the input but leaves the alien intact
+* `Backspace` deletes the most recent character (if implemented)
+
+## Stage 3 — Multiple aliens + prefix-locking (not yet built)
+
+* All previous checks still pass
+* Three aliens visible with three different words (different first letters)
+* Pressing the first letter of any word visually locks onto that alien
+* Typed prefix renders in a different color than the untyped suffix on the targeted word
+* While locked, pressing a letter that does not extend the locked word is ignored (no lock loss)
+* Completing the locked word (+ `Enter` if Enter required) destroys the alien and clears the lock
+
+## Stage 4 — Word list + spawning (not yet built)
+
+* All previous checks still pass
+* Aliens spawn at the top of the screen at the configured interval
+* Each alien gets a word from `assets/words.txt`
+* No two on-screen aliens carry the same word at the same time
+* Aliens spawn at varied x positions (not all stacked at one column)
+
+## Stage 5 — Falling + miss (not yet built)
+
+* All previous checks still pass
+* Aliens drift downward at the configured speed
+* Crossing the bottom of the screen logs a miss and removes the alien
+* Missing the *targeted* alien clears the active prefix lock
+
+## Stage 6 — Hearts + game over (not yet built)
+
+* All previous checks still pass
+* Hearts HUD renders in the top-right (carry-over from legacy `style.py`)
+* Each miss decrements one heart
+* At zero hearts, gameplay stops and a "GAME OVER — press Enter to restart" screen appears
+* `Enter` from the game-over screen resets hearts, clears aliens, and starts a fresh run
+
+## Stage 7 — Score + difficulty ramp (not yet built)
+
+* All previous checks still pass
+* Score increments per word killed, visible on the HUD
+* High score persists across runs (JSON save from legacy `ScoreManager`)
+* Spawn rate visibly increases as score climbs (clamped to a minimum interval)
+* Game does not become unplayable — the ramp tops out at "challenging but doable"
+
+## Stage 8 — Audio + explosion (not yet built)
+
+* All previous checks still pass
+* Laser SFX plays on word completion
+* Explosion sprite + SFX plays at the killed alien's position
+* Background music plays during a run, stops on game over
+* Master volume can be adjusted with `+` / `-`
+* No audio stutter or duplicate-play artifacts
+
+## Stage 9 — Menus + leaderboard (not yet built)
+
+* All previous checks still pass
+* Title screen shows on launch with "press Enter to begin" prompt
+* Game-over screen shows final score and high score
+* If score qualifies, initials entry appears (arrow keys cycle, Enter submits)
+* Pause: `Enter` pauses *only* when no word is currently being typed
+* Full loop is reachable: title → play → game over → (initials) → title
+
+## Stage 10 — V2 (per feature)
+
+Add per-feature checks as features land.
+
+---
 
 # Refactoring Rules
-* Update CHANGELOG.md for every code change (timestamp, file, line numbers, before/after, why) including which AI model made the change. Read it first before making changes so you know the current state.
+
+These rules carry over from the Star Hero codebase and apply to all Typing Hero code. Read them before any non-trivial edit.
+
+* Update `CHANGELOG.md` for every code change (timestamp, file, line numbers, before/after, why) including which AI model made the change. Read it first before making changes so you know the current state.
 * All code must be PEP-8 compliant.
 * Less code is better than more code, but clean and readable code is the best.
-* Keep "middlemen" minimal, if A calls B, and all B does is call C, A should just call C
+* Keep "middlemen" minimal — if A calls B, and all B does is call C, A should just call C.
 * Keep code clean of dead imports, unused variables and functions, and legacy code.
-* GameManager must be light, offload responsibilities to other classes
-* When possible classes should comminicate to eachother through GameManager.
-* Any new names for classes and functions must be clear regarding it's function
-* Keep all constants declared in settings.py, avoid magic numbers
+* `GameManager` (or whatever the central coordinator is named) must be light — offload responsibilities to other classes.
+* When possible, classes should communicate to each other through `GameManager`.
+* Any new class or function names must clearly describe their function.
+* Keep all constants declared in `settings.py`. Avoid magic numbers.
 * All classes and functions must have a docstring.
-* All docstrings must have a summary, Args (if applicable) and Returns (if applicable)
-* Do not change function names (unless their role is now completely different)
-* Keep functions organized and grouped by role. The update and run functions in classes should be the last function, and do as little as possible. Only call other functions if possible.
+* All docstrings must have a summary, `Args` (if applicable), and `Returns` (if applicable).
+* Do not change function names unless their role is now completely different.
+* Keep functions organized and grouped by role. The `update` and `run` functions in classes should be the last function and do as little as possible — only call other functions if possible.
 * Do not change variable names if not necessary.
-* Function names and variable names must be descriptive.
+* Function and variable names must be descriptive.
 * Do not remove comments.
-* Comments must explain why, not just what.
-* When making a change, do not leave a comment that a change was made, unless it was to fix a bug that wasn't obvious and to explain why something was done in an unconventional way.
+* Comments must explain *why*, not just *what*.
+* When making a change, do not leave a comment that a change was made — unless it was to fix a bug that wasn't obvious, in which case explain why something was done in an unconventional way.
