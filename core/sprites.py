@@ -55,7 +55,10 @@ class Alien(pygame.sprite.Sprite):
 
         The word's baseline sits ``WordSettings.OFFSET_ABOVE_SPRITE``
         pixels above the alien's top edge so the text stays clear of
-        the sprite art at any sprite scale.
+        the sprite art at any sprite scale. The word is uppercased on
+        render to honor the project-wide capitalization rule (see
+        ``docs/TODO.md`` Q7) — storing ``self.word`` in any case is
+        fine; what reaches the screen is always all caps.
 
         Args:
             surface (pygame.Surface): Destination surface, typically the
@@ -64,7 +67,7 @@ class Alien(pygame.sprite.Sprite):
                 the word. Caller owns the font so it can be reused
                 across many aliens without re-loading per frame.
         """
-        word_surf = font.render(self.word, True, WordSettings.COLOR)
+        word_surf = font.render(self.word.upper(), True, WordSettings.COLOR)
         word_rect = word_surf.get_rect(
             midbottom=(self.rect.centerx, self.rect.top - WordSettings.OFFSET_ABOVE_SPRITE)
         )

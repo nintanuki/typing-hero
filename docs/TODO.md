@@ -92,7 +92,17 @@ Decision: start with 3 hearts × 1 miss each but **tune alien speed and spawn ra
 Tentatively: tie difficulty to alien color, since the four colors already exist in the asset set. Red = easy/short, blue = hard/long. This also gives a reason to vary point values by color.
 
 ### Q7. Capitalization & punctuation
-v1: lowercase-only words, no punctuation. Defer everything else.
+**Decision:** all in-game text is displayed in UPPERCASE. This is a project-wide rule
+(see §6 pitfall "All in-game text is uppercase"): alien words, the player's typed
+buffer, HUD score, "GAME OVER" banner, leaderboard initials — every string we
+``font.render`` goes through ``.upper()`` (or is stored uppercase) before it hits
+the screen. The Pixeled font already reads as a chunky pixel-arcade face, and
+keeping everything in caps reinforces the cabinet vibe and removes a class of
+"typed 'h' but the alien word starts with 'H'" matching bugs.
+
+Comparisons against typed input are case-insensitive (compare ``input.upper()``
+against ``alien.word.upper()``) so the underlying word list can stay lowercase
+on disk if that's easier to maintain. No punctuation in v1.
 
 ### Q8. Powerups in a typing context
 Most don't translate. Candidates that *could* fit:
@@ -170,17 +180,19 @@ Each stage is small enough to finish, run, and *see something change* in one sit
 - [x] 2. In `main.py`, instantiate one alien at `(WIDTH/2, HEIGHT/2)` with `word="hello"`. Add it to a sprite group. Draw the group + the word each frame.
 - [x] 3. Smoke test: window shows alien + "hello" above it.
 
-### Stage 2 — Type the word to destroy the alien
+### Stage 2 — Type the word to destroy the alien ✅
 **Goal:** Typing "hello" + Enter removes the alien and prints "kill" to the console (no laser visual yet).
 
 **Steps:**
 
-- [ ] 1. Capture `pygame.KEYDOWN` events; build up a `current_input` string from letter keys.
-- [ ] 2. Render `current_input` somewhere visible (e.g. bottom-center of screen) so we can debug.
-- [ ] 3. On Enter, if `current_input == alien.word`, kill the alien and reset `current_input`. If not, just reset `current_input`.
-- [ ] 4. Smoke test: typing "hello" + Enter removes the alien; typing "wrong" + Enter does nothing but clears the buffer.
+- [x] 1. Capture `pygame.KEYDOWN` events; build up a `current_input` string from letter keys.
+- [x] 2. Render `current_input` somewhere visible (e.g. bottom-center of screen) so we can debug.
+- [x] 3. On Enter, if `current_input == alien.word`, kill the alien and reset `current_input`. If not, just reset `current_input`.
+- [x] 4. Smoke test: typing "hello" + Enter removes the alien; typing "wrong" + Enter does nothing but clears the buffer.
 
-**Open question to resolve here:** does Enter trigger fire, or auto-fire on last letter? (Q2.) If unresolved, do Enter for now — easier to remove later.
+**Resolution this stage:** went with **Enter required** to fire (Q2), keeping the deliberate cabinet-commit feel — auto-fire is easy to add later by moving the comparison out of the `K_RETURN` branch into the letter-append branch. Wrong-character handling (Q3) is moot at Stage 2 because there is no prefix lock yet; the buffer just accumulates whatever letters the player presses until Enter. Backspace removes the most recent character (TESTING.md asks for this as an optional QoL).
+
+**Capitalization rule lands here.** Q7 is now resolved: every string we render goes through `.upper()`. The Stage 2 work threads this through three places — `Alien.draw_word`, the typing-buffer blit in `main.py`, and the Enter-comparison (which uppercases both sides before checking equality). Future stages must keep that pattern.
 
 ### Stage 3 — Multiple aliens with prefix-locking
 **Goal:** Three aliens visible with different words. Typing the first letter of one of them locks onto it (visual highlight); typing the rest of the word + Enter destroys it.
@@ -275,6 +287,7 @@ Each stage is small enough to finish, run, and *see something change* in one sit
 
 ## 6. Pitfalls and notes for future-me
 
+- **All in-game text is uppercase.** Project-wide rule (see Q7). Every string that gets rendered to the screen — alien words, the typing buffer, HUD score, "GAME OVER", leaderboard initials — must be uppercased before ``font.render``. Word comparisons against typed input are case-insensitive. Storing words lowercase on disk is fine; just `.upper()` at render time and at compare time. If you find a bare ``font.render(some_string, ...)`` that hasn't been uppercased, that's a bug.
 - **Don't dump `legacy/` files into context.** They're long. Read the specific class or function you're porting, not the whole file. Use `Grep` and `Read` with `offset`/`limit`.
 - **Settings discipline.** The Refactoring Rules in `docs/TESTING.md` say no magic numbers — everything tunable goes in `settings.py`. Keep that habit; Star Hero's `settings.py` is well-organized and worth emulating.
 - **CHANGELOG discipline.** Every code change gets an entry. See `docs/CHANGELOG.md` for the format.

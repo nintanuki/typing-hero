@@ -328,3 +328,109 @@ Stage 1 of the TODO build plan: a single static red alien renders at center-scre
         pygame.quit()
 **Why:** TODO Stage 1 step 2. Adds exactly the two things Stage 1 calls for: instantiate one alien at `ScreenSettings.CENTER` with `word="hello"` in a sprite group, then on each frame draw the group and call `draw_word` for every alien in it. The font is loaded once outside the loop because re-loading on every tick would burn time for no reason (Pitfall in TODO §6: "cache the rendered surface ... if performance matters later" — caching the font itself is the cheap version of that). The hardcoded `'red'` and `'hello'` are placeholders for the real word list + spawn director arriving in Stage 4; Stage 1's job is to prove that one alien + one word render correctly, not to make the choice random.
 **Editor:** Claude Opus 4.7 via Cowork
+
+## 2026-05-03 05:59 UTC — Stage 2 (type-to-destroy) + project-wide uppercase rule
+
+Stage 2 of the build plan lands: the player can now type letters into a buffer rendered at the bottom of the screen, and pressing `Enter` while the buffer matches the alien's word destroys the alien (and prints "kill" to the console). A wrong submission clears the buffer without affecting the alien. `Backspace` removes the most recent letter. Same entry establishes the project-wide capitalization rule — Q7 in `docs/TODO.md` is resolved as "all in-game text renders uppercase, comparisons are case-insensitive" — and threads `.upper()` through both the alien-word render and the typing-buffer render so nothing currently on screen escapes the rule.
+
+**File:** docs/TODO.md
+**Date and Time:** 2026-05-03 05:59 UTC
+**Lines (at time of edit):** 95-96 (Q7 expanded) and §6 pitfalls (one new bullet inserted at the top of the list)
+**Before:**
+    ### Q7. Capitalization & punctuation
+    v1: lowercase-only words, no punctuation. Defer everything else.
+**After:**
+    ### Q7. Capitalization & punctuation
+    **Decision:** all in-game text is displayed in UPPERCASE...
+    Comparisons against typed input are case-insensitive...
+    No punctuation in v1.
+    [§6 also gains a new bullet: "All in-game text is uppercase. Project-wide rule..."]
+**Why:** Q7 was the only Stage 2 question that needed a project-wide answer rather than a stage-local one — once we decide that the screen always shows caps, every future render has to obey, and the rule belongs in both the design-question section (so the decision is recorded) and the pitfalls section (so it's the first thing a future session sees when they grep §6 for gotchas). The Pixeled font is already chunky pixel-arcade, and uppercase reinforces that read; it also collapses an entire class of "user typed 'h' but the word starts with 'H'" matching bugs by making case irrelevant at compare time.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** docs/TODO.md
+**Date and Time:** 2026-05-03 05:59 UTC
+**Lines (at time of edit):** Stage 2 heading + 4 step boxes + new resolution paragraph
+**Before:**
+    ### Stage 2 — Type the word to destroy the alien
+    [4 unchecked step boxes]
+    **Open question to resolve here:** does Enter trigger fire, or auto-fire on last letter? (Q2.)...
+**After:**
+    ### Stage 2 — Type the word to destroy the alien ✅
+    [4 checked step boxes]
+    **Resolution this stage:** went with **Enter required** to fire (Q2)...
+    **Capitalization rule lands here.** Q7 is now resolved...
+**Why:** Mirrors the convention set in the Stage 0/Stage 1 entries — once the boxes are ticked, the heading gets a ✅ and a "what we actually decided / what we built" paragraph replaces the original "open question" paragraph so future readers see the resolution inline rather than having to cross-reference the changelog.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** docs/TESTING.md
+**Date and Time:** 2026-05-03 05:59 UTC
+**Lines (at time of edit):** 20-25 (Stage 2 section)
+**Before:**
+    ## Stage 2 — Type to destroy (not yet built)
+    [4 generic bullets covering keystroke echo, Enter destroy, wrong-word clear, optional backspace]
+**After:**
+    ## Stage 2 — Type to destroy ✅
+    [Same 4 bullets tightened to match what shipped, plus a new bullet that calls out the
+     project-wide uppercase rule as a thing to verify whenever new text-rendering code
+     lands.]
+**Why:** Same pattern as TODO — flip "(not yet built)" to ✅ once the stage's smoke tests are live, and harden the wording from "if implemented" hedges into definite checks. The added uppercase bullet is the regression hook for Q7: any future stage that adds text needs to be smoke-tested against it.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** settings.py
+**Date and Time:** 2026-05-03 05:59 UTC
+**Lines (at time of edit):** 89-110 (new `TypingSettings` class appended after `WordSettings`)
+**Before:**
+    class WordSettings:
+        SIZE = FontSettings.MEDIUM
+        COLOR = ColorSettings.COLORS['WHITE']
+        OFFSET_ABOVE_SPRITE = 12
+    [end of file]
+**After:**
+    class WordSettings:
+        ...
+        OFFSET_ABOVE_SPRITE = 12
+
+
+    class TypingSettings:
+        """...all in-game text renders in UPPERCASE..."""
+
+        SIZE = FontSettings.LARGE
+        COLOR = ColorSettings.COLORS['WHITE']
+        OFFSET_FROM_BOTTOM = 24
+        MAX_LENGTH = 32
+**Why:** Stage 2 introduces three new tunables that Refactoring Rules require to live in `settings.py` (no magic numbers): the font size for the typing buffer (LARGE so it reads as a HUD piece distinct from per-alien word labels at MEDIUM), the pixel offset between the buffer and the bottom of the screen (24 — clears the screen edge but doesn't drift up into playfield), and a hard cap on buffer length (32 — defensive guard against keyboard-repeat or paste growing the surface unbounded; v1 words are well under it). The class docstring restates the uppercase rule so a future reader skimming `settings.py` cold sees it without needing to find Q7.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** core/sprites.py
+**Date and Time:** 2026-05-03 05:59 UTC
+**Lines (at time of edit):** 53-71 (`Alien.draw_word` body)
+**Before:**
+    word_surf = font.render(self.word, True, WordSettings.COLOR)
+**After:**
+    word_surf = font.render(self.word.upper(), True, WordSettings.COLOR)
+    [docstring also expanded to call out the rule]
+**Why:** Apply the project-wide uppercase rule at the only place text leaves this file. Storing `self.word` in any case stays fine — the word list ported in Stage 4 will likely be lowercase on disk for ergonomics — but what reaches the screen is always caps. The docstring now mentions Q7 explicitly so the rule is discoverable from the call site without crossing files.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** main.py
+**Date and Time:** 2026-05-03 05:59 UTC
+**Lines (at time of edit):** 1-117 (rewritten)
+**Before:**
+    """Typing Hero entry point. Stage 1 scaffold..."""
+    [Stage 1 main loop: QUIT + ESC, draw alien, draw word, flip]
+**After:**
+    """Typing Hero entry point. Stage 2 scaffold..."""
+    [Adds: typing_font load, current_input buffer, KEYDOWN branches for
+     RETURN (compare uppercased buffer against alien.word.upper(), kill on
+     match, print "kill", always reset buffer), BACKSPACE (drop last char),
+     unicode.isalpha() append capped at TypingSettings.MAX_LENGTH. Adds
+     bottom-center buffer blit guarded by `if current_input` so empty-buffer
+     frames skip the render call.]
+**Why:** TODO Stage 2 steps 1-3. Notes:
+ * **Enter triggers fire** (Q2 resolved as "Enter required") — easier to relax to auto-fire later than to add Enter back in once the muscle memory of pressing Enter has settled.
+ * **Compare via `.upper()` on both sides** — the project-wide rule says rendered text is uppercase, but `event.unicode` from KEYDOWN can be either case depending on Shift / Caps Lock; uppercasing both sides decouples the comparison from whatever case the player happened to type in.
+ * **`isalpha()` filter** — Q7 said no punctuation or digits in v1, so non-letter keys (numbers, symbols, modifiers) are simply not appended to the buffer. Modifier-only keys also pass `isalpha()` as `False` because their `event.unicode` is empty.
+ * **Linear scan over the alien group on Enter** — at Stage 2 there is exactly one alien, but the same code keeps working at Stage 3 once multiple aliens are on screen; only the prefix-lock targeting changes. Iterating `list(aliens)` rather than `aliens` so `alien.kill()` (which mutates the group) doesn't disturb the iteration.
+ * **`if current_input` guard around the buffer blit** — saves a `font.render("")` and a blit on every empty-buffer frame, which is most of them between submissions.
+**Editor:** Claude Opus 4.7 via Cowork

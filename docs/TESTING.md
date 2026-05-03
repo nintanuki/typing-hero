@@ -17,13 +17,14 @@ Run the relevant section after every change. Each stage in [`TODO.md`](TODO.md) 
 * The word "hello" is rendered above the alien in the Pixeled font
 * Sprite and text remain visible across multiple frames (no flicker)
 
-## Stage 2 — Type to destroy (not yet built)
+## Stage 2 — Type to destroy ✅
 
 * All previous checks still pass
-* Letter keystrokes are echoed to a debug area on screen
-* Typing the alien's word + `Enter` removes the alien
+* Letter keystrokes are echoed to a debug area on screen (bottom-center, uppercase)
+* Typing the alien's word + `Enter` removes the alien and prints `kill` to the console
 * Typing a wrong word + `Enter` clears the input but leaves the alien intact
-* `Backspace` deletes the most recent character (if implemented)
+* `Backspace` deletes the most recent character
+* All on-screen text renders in UPPERCASE (project-wide rule, see TODO Q7) — alien word, typing buffer, and any future HUD strings must all be uppercase before they hit `font.render`
 
 ## Stage 3 — Multiple aliens + prefix-locking (not yet built)
 

@@ -85,3 +85,28 @@ class WordSettings:
     # sprite, small enough that it still reads as "this word belongs to
     # this alien" at typical spawn density.
     OFFSET_ABOVE_SPRITE = 12
+
+
+class TypingSettings:
+    """Tunables for capturing player typing and rendering the typing buffer.
+
+    Project-wide rule (see ``docs/TODO.md`` Q7): all in-game text renders
+    in UPPERCASE. The typing buffer follows that rule too, regardless of
+    the actual key-case the player presses.
+    """
+
+    # Font size for the bottom-of-screen typing buffer. LARGE gives the
+    # player's typed letters more visual weight than the per-alien word
+    # labels, so the buffer reads as a HUD element rather than another
+    # alien's tag.
+    SIZE = FontSettings.LARGE
+    COLOR = ColorSettings.COLORS['WHITE']
+    # Vertical distance between the typing buffer's baseline and the
+    # bottom edge of the screen. Big enough that descenders / pixel
+    # artifacts in Pixeled don't kiss the screen edge, small enough
+    # that the buffer doesn't drift up into the playfield.
+    OFFSET_FROM_BOTTOM = 24
+    # Maximum buffer length. Words land well under this in v1; the cap
+    # exists so a stray keyboard repeat or paste doesn't grow the
+    # rendered surface unbounded across the screen.
+    MAX_LENGTH = 32
