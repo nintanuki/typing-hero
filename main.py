@@ -1,16 +1,18 @@
 """Typing Hero entry point.
 
-Stage 0 scaffold: opens a single pygame window, runs the event loop, fills
-the screen with the background color each frame, and exits cleanly on
-window-close or ESC. Game systems (sprites, typing, audio, HUD) come online
-in later stages.
+Stage 1 scaffold: opens the pygame window, runs the event loop, and
+renders a single static red alien at center-screen with the word
+"hello" floating above it. No keyboard input handling, no falling
+motion, no destruction — those land in later stages. The game still
+exits cleanly on QUIT or ESC, just as in Stage 0.
 """
 
 import sys
 
 import pygame
 
-from settings import ScreenSettings
+from core.sprites import Alien
+from settings import FontSettings, ScreenSettings, WordSettings
 
 
 def run() -> None:
@@ -19,6 +21,17 @@ def run() -> None:
     screen = pygame.display.set_mode(ScreenSettings.RESOLUTION)
     pygame.display.set_caption(ScreenSettings.TITLE)
     clock = pygame.time.Clock()
+
+    # Stage 1 staging: a single red alien parked at center-screen with
+    # a hardcoded word. The word list, spawn director, and per-alien
+    # color randomization arrive in Stage 4 — for now we just need
+    # something on screen to look at.
+    aliens = pygame.sprite.Group()
+    aliens.add(Alien(color='red', pos=ScreenSettings.CENTER, word='hello'))
+
+    # Font is loaded once and passed into each alien's draw_word so
+    # we never call pygame.font.Font(...) inside the per-frame loop.
+    word_font = pygame.font.Font(FontSettings.FONT, WordSettings.SIZE)
 
     running = True
     while running:
@@ -29,6 +42,9 @@ def run() -> None:
                 running = False
 
         screen.fill(ScreenSettings.BG_COLOR)
+        aliens.draw(screen)
+        for alien in aliens:
+            alien.draw_word(screen, word_font)
         pygame.display.flip()
         clock.tick(ScreenSettings.FPS)
 

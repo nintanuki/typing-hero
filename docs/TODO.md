@@ -148,34 +148,37 @@ Does it make sense in a typing game? Pause-mid-word breaks flow. Probably keep i
 
 Each stage is small enough to finish, run, and *see something change* in one sitting. Each ends with a manual smoke test (mirrored in `docs/TESTING.md`). Do not skip ahead — earlier stages give later stages somewhere to dock.
 
-### Stage 0 — Scaffold
+### Stage 0 — Scaffold ✅
 **Goal:** `python main.py` opens a 600×800 black pygame window titled "Typing Hero" that closes on ESC or window-close.
 
 **Steps:**
-1. Copy `legacy/assets/` to `assets/` at the repo root.
-2. Create `core/__init__.py`, `systems/__init__.py`, `ui/__init__.py` (empty).
-3. Create a stripped `settings.py` containing only: `ColorSettings`, `ScreenSettings`, `FontSettings`, `AudioSettings`, `AssetPaths`. No game-mechanic constants yet.
-4. Create `main.py` that initializes pygame, opens the display, runs an event loop (QUIT + ESC), fills the screen black each frame, flips, and ticks the clock.
-5. Smoke test: window opens, ESC closes it, no errors.
+
+- [x] 1. Copy `legacy/assets/` to `assets/` at the repo root.
+- [x] 2. Create `core/__init__.py`, `systems/__init__.py`, `ui/__init__.py` (empty).
+- [x] 3. Create a stripped `settings.py` containing only: `ColorSettings`, `ScreenSettings`, `FontSettings`, `AudioSettings`, `AssetPaths`. No game-mechanic constants yet.
+- [x] 4. Create `main.py` that initializes pygame, opens the display, runs an event loop (QUIT + ESC), fills the screen black each frame, flips, and ticks the clock.
+- [x] 5. Smoke test: window opens, ESC closes it, no errors.
 
 **Out of scope:** anything else. Resist adding a player sprite here.
 
-### Stage 1 — One alien, one word on screen
+### Stage 1 — One alien, one word on screen ✅
 **Goal:** A single red alien sprite is rendered at center-screen with the word "hello" displayed above it. Nothing moves, nothing reacts to input.
 
 **Steps:**
-1. Create `core/sprites.py` with a stripped-down `Alien` class: loads one sprite, has a `word` attribute, has a `draw_word(surface, font)` method that renders the word above its rect.
-2. In `main.py`, instantiate one alien at `(WIDTH/2, HEIGHT/2)` with `word="hello"`. Add it to a sprite group. Draw the group + the word each frame.
-3. Smoke test: window shows alien + "hello" above it.
+
+- [x] 1. Create `core/sprites.py` with a stripped-down `Alien` class: loads one sprite, has a `word` attribute, has a `draw_word(surface, font)` method that renders the word above its rect.
+- [x] 2. In `main.py`, instantiate one alien at `(WIDTH/2, HEIGHT/2)` with `word="hello"`. Add it to a sprite group. Draw the group + the word each frame.
+- [x] 3. Smoke test: window shows alien + "hello" above it.
 
 ### Stage 2 — Type the word to destroy the alien
 **Goal:** Typing "hello" + Enter removes the alien and prints "kill" to the console (no laser visual yet).
 
 **Steps:**
-1. Capture `pygame.KEYDOWN` events; build up a `current_input` string from letter keys.
-2. Render `current_input` somewhere visible (e.g. bottom-center of screen) so we can debug.
-3. On Enter, if `current_input == alien.word`, kill the alien and reset `current_input`. If not, just reset `current_input`.
-4. Smoke test: typing "hello" + Enter removes the alien; typing "wrong" + Enter does nothing but clears the buffer.
+
+- [ ] 1. Capture `pygame.KEYDOWN` events; build up a `current_input` string from letter keys.
+- [ ] 2. Render `current_input` somewhere visible (e.g. bottom-center of screen) so we can debug.
+- [ ] 3. On Enter, if `current_input == alien.word`, kill the alien and reset `current_input`. If not, just reset `current_input`.
+- [ ] 4. Smoke test: typing "hello" + Enter removes the alien; typing "wrong" + Enter does nothing but clears the buffer.
 
 **Open question to resolve here:** does Enter trigger fire, or auto-fire on last letter? (Q2.) If unresolved, do Enter for now — easier to remove later.
 
@@ -183,11 +186,12 @@ Each stage is small enough to finish, run, and *see something change* in one sit
 **Goal:** Three aliens visible with different words. Typing the first letter of one of them locks onto it (visual highlight); typing the rest of the word + Enter destroys it.
 
 **Steps:**
-1. Spawn three hardcoded aliens at fixed positions with three different words (different first letters).
-2. Build a small `WordManager` (in `systems/word_manager.py`) that tracks `current_prefix` and `targeted_alien`. On each KEYDOWN: if no target locked, find the alien whose word starts with the new prefix; if a target is locked, append the letter only if the new prefix still matches the target's word.
-3. Visually highlight the targeted alien (e.g. tint its word color or draw a bracket around it). Render typed prefix in a different color than untyped letters in the targeted word.
-4. On Enter (or full match), if the prefix equals the target's word, kill it and clear the lock.
-5. Smoke test: pressing different first letters locks onto the matching alien; typing the wrong continuation does not advance.
+
+- [ ] 1. Spawn three hardcoded aliens at fixed positions with three different words (different first letters).
+- [ ] 2. Build a small `WordManager` (in `systems/word_manager.py`) that tracks `current_prefix` and `targeted_alien`. On each KEYDOWN: if no target locked, find the alien whose word starts with the new prefix; if a target is locked, append the letter only if the new prefix still matches the target's word.
+- [ ] 3. Visually highlight the targeted alien (e.g. tint its word color or draw a bracket around it). Render typed prefix in a different color than untyped letters in the targeted word.
+- [ ] 4. On Enter (or full match), if the prefix equals the target's word, kill it and clear the lock.
+- [ ] 5. Smoke test: pressing different first letters locks onto the matching alien; typing the wrong continuation does not advance.
 
 **Open question to resolve:** what happens on a wrong character mid-word? (Q3.) For v1, recommend: ignore the keystroke, do not break the lock.
 
@@ -195,29 +199,32 @@ Each stage is small enough to finish, run, and *see something change* in one sit
 **Goal:** Aliens spawn at the top of the screen at intervals, each picking a random word from `assets/words.txt`. They still don't move.
 
 **Steps:**
-1. Add `assets/words.txt` with 50–100 short common words.
-2. `WordManager` loads the file at boot and serves random words on demand. Ensure no duplicate words on screen at once (otherwise prefix-locking is ambiguous).
-3. Port a stripped `SpawnDirector` from `legacy/systems/managers.py` that fires a pygame timer event every N ms and spawns one alien at a random x position near the top.
-4. Smoke test: aliens appear at the top every couple seconds, with unique words. Typing still works against any of them.
+
+- [ ] 1. Add `assets/words.txt` with 50–100 short common words.
+- [ ] 2. `WordManager` loads the file at boot and serves random words on demand. Ensure no duplicate words on screen at once (otherwise prefix-locking is ambiguous).
+- [ ] 3. Port a stripped `SpawnDirector` from `legacy/systems/managers.py` that fires a pygame timer event every N ms and spawns one alien at a random x position near the top.
+- [ ] 4. Smoke test: aliens appear at the top every couple seconds, with unique words. Typing still works against any of them.
 
 ### Stage 5 — Aliens fall + miss mechanic
 **Goal:** Aliens drift downward. Reaching the bottom edge counts as a miss (just print "miss" for now).
 
 **Steps:**
-1. Port the alien movement loop from `legacy/core/sprites.py` `Alien.calculate_movement` — vertical-only for now, slow speed (start with `1` px/frame at 60 FPS, tune later).
-2. When `alien.rect.top > ScreenSettings.HEIGHT`, trigger a miss callback and `alien.kill()`.
-3. If the killed alien was the active target, clear the lock.
-4. Smoke test: aliens fall slowly, untyped aliens disappear off the bottom and print a miss.
+
+- [ ] 1. Port the alien movement loop from `legacy/core/sprites.py` `Alien.calculate_movement` — vertical-only for now, slow speed (start with `1` px/frame at 60 FPS, tune later).
+- [ ] 2. When `alien.rect.top > ScreenSettings.HEIGHT`, trigger a miss callback and `alien.kill()`.
+- [ ] 3. If the killed alien was the active target, clear the lock.
+- [ ] 4. Smoke test: aliens fall slowly, untyped aliens disappear off the bottom and print a miss.
 
 ### Stage 6 — Hearts + game over
 **Goal:** Hearts HUD in top-right. Each miss removes one. Zero hearts → game over screen → restart.
 
 **Steps:**
-1. Port heart rendering from `legacy/ui/style.py` (`display_hearts`).
-2. Add a `hearts` counter in main; decrement on miss. At zero, set `game_active = False`.
-3. Show a minimal "GAME OVER — press Enter to restart" screen.
-4. On Enter from game-over, reset hearts, clear aliens, set `game_active = True`.
-5. Smoke test: misses subtract hearts; at zero, game-over appears; Enter restarts.
+
+- [ ] 1. Port heart rendering from `legacy/ui/style.py` (`display_hearts`).
+- [ ] 2. Add a `hearts` counter in main; decrement on miss. At zero, set `game_active = False`.
+- [ ] 3. Show a minimal "GAME OVER — press Enter to restart" screen.
+- [ ] 4. On Enter from game-over, reset hearts, clear aliens, set `game_active = True`.
+- [ ] 5. Smoke test: misses subtract hearts; at zero, game-over appears; Enter restarts.
 
 **Tuning checkpoint.** Play it. Are misses too punishing? Adjust alien speed and spawn rate before moving on. (Q5.)
 
@@ -225,40 +232,44 @@ Each stage is small enough to finish, run, and *see something change* in one sit
 **Goal:** Word kills award points. Score visible. Spawn rate (and maybe fall speed) increases as score climbs.
 
 **Steps:**
-1. Port `ScoreManager` from `legacy/systems/managers.py` — keep the JSON save and initials flow if Frankie wants leaderboards.
-2. Award points per kill. Tentatively scale by word length (longer words = more points) or by alien color (Q6).
-3. Port `SpawnDirector.adjust_difficulty` skeleton — every N points, drop spawn interval by a step (clamped to a minimum). Same for fall speed.
-4. Smoke test: score climbs, harder over time, doesn't ramp into impossibility.
+
+- [ ] 1. Port `ScoreManager` from `legacy/systems/managers.py` — keep the JSON save and initials flow if Frankie wants leaderboards.
+- [ ] 2. Award points per kill. Tentatively scale by word length (longer words = more points) or by alien color (Q6).
+- [ ] 3. Port `SpawnDirector.adjust_difficulty` skeleton — every N points, drop spawn interval by a step (clamped to a minimum). Same for fall speed.
+- [ ] 4. Smoke test: score climbs, harder over time, doesn't ramp into impossibility.
 
 ### Stage 8 — Audio + explosion polish
 **Goal:** Laser SFX on kill, explosion sprite + SFX at killed alien's position, background music.
 
 **Steps:**
-1. Port `Audio` system from `legacy/systems/audio.py`. Drop powerup-related cue keys we don't use.
-2. Port `Explosion` sprite from `legacy/core/animations.py`.
-3. On a successful kill: spawn an explosion at the alien's position, play `explosion`. Also play `laser` sound (consider: does laser play on key-press, on full-word completion, or both? Probably full-word.).
-4. Start `star_hero.ogg` BGM on game start. (Optionally re-theme the music later.)
-5. Optional: port `Background` scroll + `CRT` shader for visual flavor.
-6. Smoke test: feels arcade-y. Audio doesn't stutter.
+
+- [ ] 1. Port `Audio` system from `legacy/systems/audio.py`. Drop powerup-related cue keys we don't use.
+- [ ] 2. Port `Explosion` sprite from `legacy/core/animations.py`.
+- [ ] 3. On a successful kill: spawn an explosion at the alien's position, play `explosion`. Also play `laser` sound (consider: does laser play on key-press, on full-word completion, or both? Probably full-word.).
+- [ ] 4. Start `star_hero.ogg` BGM on game start. (Optionally re-theme the music later.)
+- [ ] 5. Optional: port `Background` scroll + `CRT` shader for visual flavor.
+- [ ] 6. Smoke test: feels arcade-y. Audio doesn't stutter.
 
 ### Stage 9 — Menus + leaderboard
 **Goal:** Title screen → game → game over → optional initials entry → restart loop. Pause works.
 
 **Steps:**
-1. Port intro/game-over rendering from `legacy/ui/style.py`. Strip any boost-meter / bombs / status-row leftovers.
-2. Port `SessionStateManager` toggle (`game_active`, `player_alive`, intro music).
-3. If keeping leaderboards, port `ScoreManager` initials entry path (arrow keys to cycle letters, Enter to submit).
-4. Pause: Enter pauses *only when no word is mid-typing* (Q10).
-5. Smoke test: full loop — title → play → game over → initials → title.
+
+- [ ] 1. Port intro/game-over rendering from `legacy/ui/style.py`. Strip any boost-meter / bombs / status-row leftovers.
+- [ ] 2. Port `SessionStateManager` toggle (`game_active`, `player_alive`, intro music).
+- [ ] 3. If keeping leaderboards, port `ScoreManager` initials entry path (arrow keys to cycle letters, Enter to submit).
+- [ ] 4. Pause: Enter pauses *only when no word is mid-typing* (Q10).
+- [ ] 5. Smoke test: full loop — title → play → game over → initials → title.
 
 ### Stage 10 — V2 / polish (pick à la carte)
-- 1–2 powerups (heal, screen-wipe, slow-time, word-skip — see Q8).
-- Difficulty bands by alien color (Q6).
-- Status effect: scrambled-letters debuff from blue aliens (Q9).
-- Re-theme the music if Star Hero's track no longer fits the vibe.
-- Custom typing-themed sprites (replace alien sprites with letter-themed enemies?).
-- Stats tracking: WPM, accuracy, longest streak.
-- Difficulty selector on title screen (easy/normal/hard alters spawn rate + word length distribution).
+
+- [ ] 1–2 powerups (heal, screen-wipe, slow-time, word-skip — see Q8).
+- [ ] Difficulty bands by alien color (Q6).
+- [ ] Status effect: scrambled-letters debuff from blue aliens (Q9).
+- [ ] Re-theme the music if Star Hero's track no longer fits the vibe.
+- [ ] Custom typing-themed sprites (replace alien sprites with letter-themed enemies?).
+- [ ] Stats tracking: WPM, accuracy, longest streak.
+- [ ] Difficulty selector on title screen (easy/normal/hard alters spawn rate + word length distribution).
 
 ---
 

@@ -217,3 +217,114 @@ First code lands in Typing Hero. This entry covers Stage 0 of the build plan in 
         sys.exit(0)
 **Why:** TODO Stage 0 step 4. Smallest possible main loop — open display, pump events, fill screen, flip, tick. Deliberately not ported from `legacy/main.py` (which is full of shooter-specific event handlers); the new `main.py` will grow stage-by-stage rather than start from a bloated copy. ESC quits the window cleanly here, matching the Stage 0 smoke test in `docs/TESTING.md`; this differs from legacy where ESC was a hard process kill — the gentler behavior is what Stage 9's pause work is going to want anyway.
 **Editor:** Claude Opus 4.7 via Cowork
+
+## 2026-05-03 05:50 UTC — TODO checkboxes + Stage 0 marked complete
+
+Audit pass over the Stage 0 deliverables. Everything required by the TODO already existed on disk (assets copied, package `__init__.py` files in place, `settings.py` exposing the five required classes, `main.py` opening a 600×800 window with QUIT/ESC handling), so no game code changed in this entry. The TODO itself was reformatted to use GitHub-style task checkboxes for every stage and step so future sessions can see at a glance what is and isn't done, and Stage 0's boxes were ticked.
+
+**File:** docs/TODO.md
+**Date and Time:** 2026-05-03 05:50 UTC
+**Lines (at time of edit):** 151-261 (Stage 0 through Stage 10)
+**Before:**
+    Stages used `**Steps:**` followed by a numbered list (`1.`, `2.`, ...).
+    Stage 10 used unchecked bullet points (`-`).
+    No completion markers anywhere.
+**After:**
+    Each numbered step is now `- [ ] N. ...` (and `- [x]` once done).
+    Stage 10 polish items are `- [ ] ...` bullets.
+    Completed stage headings get a trailing `✅`.
+    Stage 0 is fully checked; all other stages remain unchecked.
+**Why:** The plain numbered list was readable but didn't carry status. With ten stages and dozens of steps, a session opening this file cold needs to see "where are we" without diffing against the codebase. Checkboxes make it explicit and stay readable on GitHub or in a plain editor.
+**Editor:** Claude Opus 4.7 via Cowork
+
+## 2026-05-03 05:50 UTC — Stage 1 (one alien, one word on screen)
+
+Stage 1 of the TODO build plan: a single static red alien renders at center-screen with the word "hello" floating above it. New `core/sprites.py` houses a stripped-down `Alien` class; `main.py` grows from "fill black + flip" to "fill black + draw one alien + draw its word + flip"; `settings.py` gains a small `WordSettings` class so the word's color, font size, and vertical offset above the sprite are not magic numbers.
+
+**File:** core/sprites.py
+**Date and Time:** 2026-05-03 05:50 UTC
+**Lines (at time of edit):** 1-65 (new file)
+**Before:**
+    (file did not exist)
+**After:**
+    """Sprite classes for Typing Hero..."""
+    import os
+    import pygame
+    from settings import AssetPaths, WordSettings
+
+    class Alien(pygame.sprite.Sprite):
+        def __init__(self, color, pos, word):
+            super().__init__()
+            self.color = color
+            self.word = word
+            sprite_path = os.path.join(AssetPaths.GRAPHICS_DIR, f'{color}1.png')
+            self.image = pygame.image.load(sprite_path).convert_alpha()
+            self.rect = self.image.get_rect(center=pos)
+
+        def draw_word(self, surface, font):
+            word_surf = font.render(self.word, True, WordSettings.COLOR)
+            word_rect = word_surf.get_rect(midbottom=(
+                self.rect.centerx,
+                self.rect.top - WordSettings.OFFSET_ABOVE_SPRITE))
+            surface.blit(word_surf, word_rect)
+**Why:** TODO Stage 1 step 1. Minimum viable alien: load `red1.png`, place at center, expose `word`, render that word above the sprite when asked. Deliberately *not* ported wholesale from `legacy/core/sprites.py` `Alien` (which is ~180 lines of zigzag, confusion attacks, two-frame animation, off-screen destroy, and color-driven point values) — those will arrive in their respective stages so the file stays approachable. The `font` parameter is passed in rather than loaded inside `draw_word` so the per-frame loop never re-rasterizes the font; whoever calls `draw_word` is responsible for owning the font instance.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** settings.py
+**Date and Time:** 2026-05-03 05:50 UTC
+**Lines (at time of edit):** 75-87 (new `WordSettings` class appended after `AssetPaths`)
+**Before:**
+    class AssetPaths:
+        ...
+        TV = os.path.join(GRAPHICS_DIR, 'tv.png')
+    [end of file]
+**After:**
+    class AssetPaths:
+        ...
+        TV = os.path.join(GRAPHICS_DIR, 'tv.png')
+
+
+    class WordSettings:
+        """Tunables for rendering the word floating above each alien."""
+
+        SIZE = FontSettings.MEDIUM
+        COLOR = ColorSettings.COLORS['WHITE']
+        OFFSET_ABOVE_SPRITE = 12
+**Why:** Stage 1 introduces the first game-mechanic constants (per the Refactoring Rules in `docs/TESTING.md`: no magic numbers, all tunables in `settings.py`). `WordSettings.OFFSET_ABOVE_SPRITE` is the pixel gap between the word baseline and the alien sprite's top; chosen at 12 because the Pixeled font at MEDIUM (size 20) leaves a hairline of clearance, which matches Star Hero's HUD spacing language. `SIZE` reuses `FontSettings.MEDIUM` rather than hardcoding 20 so the family of font sizes stays in one place. `COLOR` defaults to white for now; once Stage 3's prefix-locking lands, this will need a "typed" vs "untyped" pair instead.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** main.py
+**Date and Time:** 2026-05-03 05:50 UTC
+**Lines (at time of edit):** 1-52 (rewritten)
+**Before:**
+    """Typing Hero entry point. Stage 0 scaffold..."""
+    [import sys; import pygame; from settings import ScreenSettings]
+    def run():
+        [init, set_mode, set_caption, clock]
+        while running:
+            [QUIT/ESC event pump]
+            screen.fill(ScreenSettings.BG_COLOR)
+            pygame.display.flip()
+            clock.tick(ScreenSettings.FPS)
+        pygame.quit()
+**After:**
+    """Typing Hero entry point. Stage 1 scaffold..."""
+    [imports now also pull Alien, FontSettings, WordSettings]
+    def run():
+        [init, set_mode, set_caption, clock]
+        aliens = pygame.sprite.Group()
+        aliens.add(Alien(color='red',
+                         pos=ScreenSettings.CENTER,
+                         word='hello'))
+        word_font = pygame.font.Font(FontSettings.FONT, WordSettings.SIZE)
+        while running:
+            [QUIT/ESC event pump unchanged]
+            screen.fill(ScreenSettings.BG_COLOR)
+            aliens.draw(screen)
+            for alien in aliens:
+                alien.draw_word(screen, word_font)
+            pygame.display.flip()
+            clock.tick(ScreenSettings.FPS)
+        pygame.quit()
+**Why:** TODO Stage 1 step 2. Adds exactly the two things Stage 1 calls for: instantiate one alien at `ScreenSettings.CENTER` with `word="hello"` in a sprite group, then on each frame draw the group and call `draw_word` for every alien in it. The font is loaded once outside the loop because re-loading on every tick would burn time for no reason (Pitfall in TODO §6: "cache the rendered surface ... if performance matters later" — caching the font itself is the cheap version of that). The hardcoded `'red'` and `'hello'` are placeholders for the real word list + spawn director arriving in Stage 4; Stage 1's job is to prove that one alien + one word render correctly, not to make the choice random.
+**Editor:** Claude Opus 4.7 via Cowork

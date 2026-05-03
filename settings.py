@@ -70,3 +70,18 @@ class AssetPaths:
     PLAYER = os.path.join(GRAPHICS_DIR, 'player_ship.png')
     HEART = os.path.join(GRAPHICS_DIR, 'heart.png')
     TV = os.path.join(GRAPHICS_DIR, 'tv.png')
+
+
+class WordSettings:
+    """Tunables for rendering the word floating above each alien."""
+
+    # Font size used when rasterizing alien words. MEDIUM keeps short
+    # 4-6 letter words readable without crowding the sprite; revisit if
+    # Stage 6+ tuning makes longer words common.
+    SIZE = FontSettings.MEDIUM
+    COLOR = ColorSettings.COLORS['WHITE']
+    # Pixel gap between the word's baseline and the alien sprite's top
+    # edge. Big enough that the word never visually merges with the
+    # sprite, small enough that it still reads as "this word belongs to
+    # this alien" at typical spawn density.
+    OFFSET_ABOVE_SPRITE = 12

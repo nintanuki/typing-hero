@@ -2,7 +2,7 @@
 
 Run the relevant section after every change. Each stage in [`TODO.md`](TODO.md) ends with a smoke test that gets added here once the stage lands. Earlier stages stay in the list — anything that *was* working should *still* be working.
 
-## Stage 0 — Scaffold (not yet built)
+## Stage 0 — Scaffold ✅
 
 * `python main.py` opens a 600×800 window titled "Typing Hero"
 * Window background is solid black (no errors blitting nothing)
@@ -10,7 +10,7 @@ Run the relevant section after every change. Each stage in [`TODO.md`](TODO.md) 
 * Closing the window via the OS chrome closes the process cleanly
 * No tracebacks on startup or shutdown
 
-## Stage 1 — One alien, one word (not yet built)
+## Stage 1 — One alien, one word ✅
 
 * All Stage 0 checks still pass
 * A single alien sprite is visible at center-screen
