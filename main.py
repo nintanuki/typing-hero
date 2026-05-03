@@ -1,22 +1,28 @@
 """Typing Hero entry point.
 
-Stage 6 scaffold: runs now *end*. The player has ``HeartSettings.MAX``
-hearts; each missed alien costs one. When the count hits zero, the
-loop flips into a game-over state — alien motion, miss-detection, the
-spawn timer, and typing input all gate off, the active typing lock
-clears, and a centered "GAME OVER — press Enter to restart" overlay
-draws on top of the frozen playfield. Pressing Enter from that state
-clears the alien group, resets the heart counter, kicks a fresh first-
-frame spawn, and the run resumes.
+Stage 7 wires score + difficulty ramp on top of Stage 6's hearts /
+game-over loop. Each successful word-completion now awards the
+``AlienSettings.POINTS[color]`` value for the killed alien — red 100,
+green 200, yellow 300, blue 500 — and a top-left score readout shows
+the running total + the persisted high score. The four colors also
+fall at distinct per-color speeds (red slowest, blue fastest) so the
+"easier color = lower reward + slower" / "harder color = higher reward
++ faster" contract from ``docs/TODO.md`` Q6 reads correctly. After
+every kill, ``SpawnDirector.adjust_difficulty`` re-arms the spawn timer
+based on the current score so the spawn interval visibly tightens at
+each ``ScoreSettings.DIFFICULTY_STEP`` threshold (3000 → 2800 → 2600 →
+… clamped at ``MIN_SPAWN_RATE = 1200`` ms). On game-over the score is
+persisted to ``high_score.txt`` so the high-score row survives
+restarts; ``ScoreManager.reset`` zeroes the run score on the next
+play but leaves the persisted record intact.
 
-Stage 5's falling motion + miss callback (the ``aliens.update()`` and
-``rect.top > HEIGHT`` scan) is preserved verbatim except that the miss
-callback now decrements ``hearts`` and ends the run at zero. Stage 4's
-``SpawnDirector`` + first-frame spawn is unchanged. Stage 3's
-``WordManager`` is unchanged. Hearts render in the top-right via the
-new ``HeartsHUD``; the game-over overlay renders via ``GameOverScreen``
-— both ported from ``legacy/ui/style.py`` with the boost-meter / status-
-row / bombs-row fluff cut out.
+Stage 6's hearts/game-over flow, Stage 5's falling motion + miss
+callback, Stage 4's ``SpawnDirector`` + first-frame spawn, and Stage
+3's ``WordManager`` all carry over unchanged. Hearts render in the
+top-right via ``HeartsHUD``; the score readout renders in the top-left
+via ``ScoreHUD``; the game-over overlay renders via ``GameOverScreen``
+— all ported from ``legacy/ui/style.py`` with the boost-meter /
+status-row / bombs-row fluff cut out.
 
 ESC and the OS close button still quit the window cleanly. All text
 that reaches the screen is rendered uppercase per the project-wide
@@ -34,9 +40,10 @@ from settings import (
     TypingSettings,
     WordSettings,
 )
+from systems.score_manager import ScoreManager
 from systems.spawn_director import SpawnDirector
 from systems.word_manager import WordManager
-from ui.hud import GameOverScreen, HeartsHUD
+from ui.hud import GameOverScreen, HeartsHUD, ScoreHUD
 from ui.crt import CRT
 
 
@@ -79,12 +86,24 @@ def run() -> None:
     # than waiting out the full timer interval at boot.
     spawn_director.spawn(aliens, word_manager)
 
-    # Stage 6: HUD + game-over overlay. Both pre-rasterize their assets
-    # at construction so the per-frame draw is just blits. ``HeartsHUD``
-    # owns the heart sprite and the row geometry; ``GameOverScreen``
-    # owns the banner + prompt surfaces and their pre-computed rects.
+    # Stage 6/7: HUD + game-over overlay. Each pre-rasterizes / caches
+    # its rendering bits at construction so per-frame draws are just
+    # blits and one or two ``font.render`` calls. ``HeartsHUD`` owns
+    # the heart sprite and row geometry; ``ScoreHUD`` owns the two
+    # score-row fonts; ``GameOverScreen`` owns the banner + prompt
+    # surfaces and their pre-computed rects.
     hearts_hud = HeartsHUD()
+    score_hud = ScoreHUD()
     game_over_screen = GameOverScreen()
+
+    # Stage 7: ScoreManager loads the persisted high-score from
+    # ``high_score.txt`` at boot (silently no-ops on first install
+    # when the file is absent) and exposes ``add_for_color`` /
+    # ``persist`` / ``reset`` for the run loop. Lives here as a
+    # local — Stage 9's ``SessionStateManager`` port will take
+    # ownership and route reset/persist through the central
+    # coordinator, but the same instance survives that move.
+    scores = ScoreManager()
 
     # Stage 6: hearts counter + game_active flag. Hearts decrement on
     # miss; at zero, ``game_active`` flips to False and the run ends.
@@ -125,6 +144,21 @@ def run() -> None:
                         # "Enter always resets the buffer" feel).
                         killed = word_manager.handle_enter()
                         if killed is not None:
+                            # Stage 7: award per-color points *before*
+                            # killing the sprite — once ``kill()``
+                            # detaches the alien from its group,
+                            # ``killed.color`` is still readable
+                            # (attribute lives on the instance), but
+                            # reading the score state through the
+                            # ``ScoreManager`` keeps the call site
+                            # honest about what's mutating. After the
+                            # increment, re-arm the spawn timer so the
+                            # ramp keeps pace with the new score —
+                            # cheaper than running ``adjust_difficulty``
+                            # on a second timer and avoids the legacy
+                            # footgun where the two clocks could fight.
+                            scores.add_for_color(killed.color)
+                            spawn_director.adjust_difficulty(scores.score)
                             killed.kill()
                             print("kill")
                     elif event.key == pygame.K_BACKSPACE:
@@ -154,6 +188,16 @@ def run() -> None:
                             alien.kill()
                         word_manager.clear_lock()
                         hearts = HeartSettings.MAX
+                        # Stage 7: zero the run score for a fresh start
+                        # but leave the persisted save alone — the high
+                        # score the player just beat is the headline
+                        # number for the *next* run, not something to
+                        # reset. Re-arm the spawn timer to the base
+                        # ``SpawnSettings.SPAWN_RATE`` (score=0 → step
+                        # 0 → no drop) so the new run doesn't inherit
+                        # the previous run's ramped-down interval.
+                        scores.reset()
+                        spawn_director.adjust_difficulty(scores.score)
                         spawn_director.spawn(aliens, word_manager)
                         game_active = True
 
@@ -201,7 +245,16 @@ def run() -> None:
                         # for any other aliens that crossed the bottom
                         # in the same frame — once the run is over,
                         # additional misses don't matter.
+                        # Stage 7: persist the score so the high-score
+                        # row reflects this run on the next boot. The
+                        # ``persist`` call promotes ``score`` into
+                        # ``save_data['high_score']`` only if it's a
+                        # new record, so non-record runs still write
+                        # the file (cheap) without changing the
+                        # headline number — that's the contract Stage
+                        # 9's leaderboard write extends.
                         word_manager.clear_lock()
+                        scores.persist()
                         game_active = False
                         break
 
@@ -239,7 +292,22 @@ def run() -> None:
             # live run because at zero hearts the row is empty space
             # anyway and the game-over banner is the focus.
             hearts_hud.draw(screen, hearts)
+            # Stage 7: top-left score readout. Drawn alongside the
+            # hearts row (not over the game-over overlay) so the
+            # final score is visible on the game-over screen too —
+            # Stage 9's richer game-over will replace this readout
+            # with a center-screen "YOUR SCORE" panel, but for the
+            # Stage 7 minimal-overlay flow keeping it visible reads
+            # cleaner than blanking it.
+            score_hud.draw(screen, scores.score, scores.high_score)
         else:
+            # Stage 7: keep the score readout visible on the game-over
+            # screen so the player can see what they ended on without
+            # the banner blanking it. ``ScoreHUD`` is cheap (two
+            # ``font.render`` calls) and the values don't change
+            # between frames once the run ends, so this is effectively
+            # a static blit until restart.
+            score_hud.draw(screen, scores.score, scores.high_score)
             # Drawn last so the banner + prompt sit on top of any
             # frozen aliens still on the playfield. The frozen scene
             # behind the banner reads as "this is the run you just

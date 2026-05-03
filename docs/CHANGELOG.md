@@ -1128,3 +1128,150 @@ Stage 6 of the build plan lands: runs now end. The player has `HeartSettings.MAX
      from either state.]
 **Why:** Same pattern as TODO — flip "(not yet built)" to ✅ and harden hedged checks into definite ones. Four new bullets the pre-stage version didn't have: the row-direction check (regression hook for the leftmost-empties-first rendering — easy to flip by accident if a future refactor mirrors the loop), the freeze-aliens-on-game-over check (regression hook for the `if game_active:` gate around `aliens.update()` — easy to break by hoisting the update outside the gate), the non-Enter-keys-ignored check (regression hook for the two-branch KEYDOWN split), and the lock-cleared-on-game-over check (regression hook for the explicit `word_manager.clear_lock()` call in the hearts-hit-zero branch — without it the game-over screen would still show a stale cyan prefix on the frozen alien that took the last heart).
 **Editor:** Claude Opus 4.7 via Cowork
+
+## 2026-05-03 20:41 UTC — Stage 7 score + per-color speed/points + difficulty ramp
+
+Stage 7 of the build plan in `docs/TODO.md` lands. Word kills now award points (per-color, mirroring legacy `AlienSettings.POINTS`), the four alien colors fall at distinct per-color speeds (red slowest, blue fastest), the run score + persisted high-score render in the top-left, the high score persists across runs via `high_score.txt`, and `SpawnDirector.adjust_difficulty` re-arms the spawn timer at every `ScoreSettings.DIFFICULTY_STEP` threshold so spawn cadence visibly tightens as the score climbs (clamped at `MIN_SPAWN_RATE = 1200` ms). The initials-entry flow from the legacy `ScoreManager` is *not* ported here — `docs/TODO.md` §5 Stage 9 specifically owns the initials path, so Stage 7 keeps the storage half only. The same entry also reorganizes the bottom of `docs/TODO.md` to integrate Frankie's brainstorm notes into structured sections (§8 Observations, §9 Issues, §10 Brainstorm scratch), updates Q1 with a new "static ship + homing laser from bottom + point-of-no-return" option, updates Q6 to call out the three difficulty axes (length / speed / motion shape), and adds Q11 (word readability when many aliens are on screen).
+
+**File:** docs/TODO.md
+**Date and Time:** 2026-05-03 20:41 UTC
+**Lines (at time of edit):** §2 expanded (added "What stays from Star Hero (added on Stage 7 review)" paragraph re per-color motion patterns), Q1 gained option (d) + point-of-no-return sub-question, Q6 gained Stage 7 update paragraph, Q11 added (word readability), Stage 7 plan rewritten with 6 explicit steps, §7 unchanged, §8 (Observations: O1 be-faithful, O2 snappy-kill-feel, O3 finite-readable-budget) added, §9 (Issues, empty placeholder) added, §10 (Brainstorm scratch with the four original notes promoted-and-checked-off) added.
+**Before:**
+    [Stage 7 plan was a 4-step skeleton: port ScoreManager / award
+     points / port adjust_difficulty / smoke test. Bottom of file was
+     a flat "Notes" section with four un-organized brainstorm bullets
+     from Frankie. No Observations / Issues / Brainstorm-scratch
+     structure, no Q11, no point-of-no-return option on Q1, no Stage
+     7 callout on Q6 or §2.]
+**After:**
+    [Stage 7 plan is a 6-step plan with explicit per-color SPEED +
+     POINTS, ScoreHUD top-left, adjust_difficulty re-arms spawn
+     timer, defer initials to Stage 9. New §8 Observations (3
+     entries), §9 Issues (empty placeholder explaining the
+     promotion contract), §10 Brainstorm scratch (4 original notes
+     promoted with cross-references). Q1 gains option (d) +
+     point-of-no-return sub-question + recommendation. Q6 gains
+     Stage 7 update paragraph (length/speed/motion shape as three
+     difficulty axes). Q11 added (word readability with four
+     mitigation options). §2 gains "What stays from Star Hero
+     (added on Stage 7 review)" callout reversing the implicit "all
+     motion variation cut" reading.]
+**Why:** Frankie asked to "begin Stage 7 but also read my notes at the end of the TODO and integrate them. Maybe create new sections for issues, observations, and/or questions." The new §8/§9/§10 structure gives Frankie a stable place to dump raw brainstorming (§10) that gets organized into durable sections (§3 questions, §8 observations, §9 issues) on each working pass — promoted notes stay in §10 with checkmarks + cross-references as a paper trail, so a future session can audit "where did this design decision come from." The Stage 7 plan rewrite makes the per-color SPEED change (Frankie's note "aliens should move in patterns just like the original") concrete and explicit so a future session reading the plan in isolation knows exactly what code to write.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** settings.py
+**Date and Time:** 2026-05-03 20:41 UTC
+**Lines (at time of edit):** AlienSettings (≈153-200 modified — SPEED promoted from float to dict, POINTS dict added), ScoreSettings (≈285-335 new class appended)
+**Before:**
+    class AlienSettings:
+        SPEED = 0.5  # uniform across all four colors at Stage 5
+        # (POINTS deferred to Stage 7 with comment template)
+    [no ScoreSettings]
+**After:**
+    class AlienSettings:
+        SPEED = {'red': 0.5, 'green': 0.7, 'yellow': 0.9, 'blue': 1.1}
+        POINTS = {'red': 100, 'green': 200, 'yellow': 300, 'blue': 500}
+
+    class ScoreSettings:
+        SAVE_FILENAME = 'high_score.txt'
+        SAVE_PATH = os.path.join(BASE_DIR, SAVE_FILENAME)
+        DIFFICULTY_STEP = 5000
+        SPAWN_RATE_DROP = 200
+        MIN_SPAWN_RATE = 1200
+        HIGH_SCORE_TOPLEFT = (10, 5)
+        SCORE_TOPLEFT = (10, 20)
+        HIGH_SCORE_SIZE = FontSettings.SMALL
+        SCORE_SIZE = FontSettings.MEDIUM
+        COLOR = ColorSettings.COLORS['WHITE']
+**Why:** Stage 7 step 2 (per-color POINTS) + step 3 (per-color SPEED) + step 5 (difficulty-ramp tunables). POINTS values mirror legacy exactly per §8 O1 ("be faithful to how Star Hero felt"). SPEED values scaled down from legacy 60-FPS shooter numbers (1/2/3/5 px/frame) to typing-pace 120-FPS numbers (0.5/0.7/0.9/1.1) so blue stays catchable at ~5.5 s top-to-bottom for a competent typist. ScoreSettings.SAVE_FILENAME matches the legacy filename so a Star Hero install's `high_score.txt` lands in the same slot Typing Hero reads from. DIFFICULTY_STEP=5000 mirrors legacy; SPAWN_RATE_DROP=200 (vs legacy 25) is proportionally similar because we start at 3000 ms (vs legacy 600); MIN_SPAWN_RATE=1200 is well above legacy's 150 because typing below ~1 word/second is brutal at any skill.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** core/sprites.py
+**Date and Time:** 2026-05-03 20:41 UTC
+**Lines (at time of edit):** Alien.update() docstring + body (≈62-89 modified)
+**Before:**
+    self.position.y += AlienSettings.SPEED
+**After:**
+    self.position.y += AlienSettings.SPEED[self.color]
+**Why:** AlienSettings.SPEED is now a per-color dict (Stage 7 step 3). The docstring is updated to call out that the yellow zigzag is deferred to Stage 8 polish — Stage 7's yellow falls straight down, just faster than green, so the per-color difficulty contract still reads correctly even before the motion-shape variation lands.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** systems/score_manager.py
+**Date and Time:** 2026-05-03 20:41 UTC
+**Lines (at time of edit):** (new file, ~165 lines)
+**Before:**
+    (file did not exist)
+**After:**
+    [ScoreManager class — score + save_data, _load_from_disk,
+     add_for_color(color), reset(), persist(), high_score property.
+     No initials-entry flow (deferred to Stage 9 per TODO §5).
+     Pure storage — no pygame, no rendering. Save path defaults to
+     ScoreSettings.SAVE_PATH; tests can override via constructor.]
+**Why:** Stage 7 step 1. The legacy `ScoreManager` co-located score storage with the initials-entry input flow + leaderboard mutation; Typing Hero splits those concerns because Stage 7 needs only the storage half. `add_for_color(color)` is the single increment path so a future tuning pass changes one constant. `_load_from_disk` tolerates missing-file (first boot) and corrupt-file (one bad run) without crashing — the high-score row reads `0` and the next run's persist() rewrites the save cleanly. Verified end-to-end with a Python sanity script (round-trip persist + reboot read + non-record run preserves high_score + corrupt file recovery).
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** systems/spawn_director.py
+**Date and Time:** 2026-05-03 20:41 UTC
+**Lines (at time of edit):** module docstring (~1-15 modified), ScoreSettings import added, adjust_difficulty method (~91-130 added)
+**Before:**
+    [Stage 4 SpawnDirector — only spawn(). Module docstring said
+     "Difficulty scaling … is a Stage 7 concern."]
+**After:**
+    [Same spawn() unchanged. New adjust_difficulty(score) re-arms
+     the pygame timer using floor(score / DIFFICULTY_STEP) *
+     SPAWN_RATE_DROP, clamped at MIN_SPAWN_RATE. Returns the new
+     rate for testability. Module docstring updated to reflect that
+     Stage 7 has now landed the scaling leg.]
+**Why:** Stage 7 step 5. The `score` parameter is passed in (rather than the director holding a reference to ScoreManager) so the director stays trivial to construct in tests — same separation pattern as `spawn(aliens, word_manager)`. Re-arming the timer in-place via `pygame.time.set_timer` means each step boundary has a small jitter (the next spawn fires `new_rate` ms from *now*, not from the previous tick), which reads as natural pacing rather than a visible cadence shift.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** ui/hud.py
+**Date and Time:** 2026-05-03 20:41 UTC
+**Lines (at time of edit):** module docstring (~1-15 modified), ScoreSettings import added, ScoreHUD class (~76-130 inserted before GameOverScreen)
+**Before:**
+    [Stage 6 HUD — HeartsHUD + GameOverScreen only. Module
+     docstring said "Stage 6 ports the bare minimum HUD pieces."]
+**After:**
+    [Same HeartsHUD + GameOverScreen unchanged. New ScoreHUD class
+     pre-loads SMALL + MEDIUM fonts at construction, renders
+     HIGH_SCORE row at HIGH_SCORE_TOPLEFT and SCORE row at
+     SCORE_TOPLEFT each draw call. Both rows uppercase per Q7.
+     Module docstring updated to mention the new HUD piece.]
+**Why:** Stage 7 step 4. Two-row top-left layout mirrors legacy `display_in_game_score` exactly per §8 O1 ("be faithful to scoreboard"). Fonts are loaded once at construction so the per-frame draw is two `font.render` calls + two blits — no font allocation in the hot path.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** main.py
+**Date and Time:** 2026-05-03 20:41 UTC
+**Lines (at time of edit):** module docstring rewritten (~1-30), ScoreManager + ScoreHUD imports added, scores instance + score_hud instance constructed at boot, kill branch increments scores + calls adjust_difficulty, restart branch resets scores + re-arms timer, miss-to-game-over branch persists scores, render pass draws score_hud in both game_active and game-over states
+**Before:**
+    [Stage 6 main.py — kill branch only logged "kill", restart
+     only refilled hearts, miss-to-game-over only cleared lock,
+     render pass only drew HeartsHUD on game_active.]
+**After:**
+    [Stage 7 wiring as described above. The kill branch now reads
+     "scores.add_for_color(killed.color); spawn_director.adjust_difficulty(scores.score); killed.kill()"
+     in that order — points awarded before kill() detaches the
+     sprite; difficulty re-armed before kill() so the next spawn
+     tick (potentially the same frame) honors the new cadence.]
+**Why:** Stage 7 wiring. `adjust_difficulty(scores.score)` is called from the kill branch (not on a separate timer) so the ramp is deterministic — at exactly N points, spawns are M ms apart — and the legacy footgun where two clocks could fight on a frame ScoreManager and SpawnDirector disagreed about the score never arises. The restart branch *also* calls `adjust_difficulty(0)` to re-arm to the base 3000 ms cadence; without it the restarted run would inherit the previous run's ramped-down interval. ScoreHUD is drawn in both branches (game_active and game-over) so the final score stays visible during the game-over banner — Stage 9's richer game-over will replace this with a center-panel "YOUR SCORE" but the Stage 7 minimal-overlay flow reads cleaner with the readout intact than with a blanked top-left.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** docs/TESTING.md
+**Date and Time:** 2026-05-03 20:41 UTC
+**Lines (at time of edit):** Stage 7 section (≈73-79 replaced; "(not yet built)" → "✅", 5 hedged bullets → 9 specific bullets)
+**Before:**
+    ## Stage 7 — Score + difficulty ramp (not yet built)
+    [5 hedged bullets — score increments, high score persists,
+     spawn rate increases, ramp doesn't break the game]
+**After:**
+    ## Stage 7 — Score + difficulty ramp ✅
+    [9 specific bullets — top-left score readout layout, per-color
+     POINTS values (red 100/green 200/yellow 300/blue 500), per-
+     color SPEED visibly differentiated (~12s red → ~6s blue),
+     first DIFFICULTY_STEP boundary at 5000 visibly tightens spawn
+     cadence, ramp clamps at MIN_SPAWN_RATE, persistence to
+     high_score.txt verifiable, reboot reads back the saved record,
+     restart zeros score + re-arms spawn timer to base, missing /
+     corrupt save file boots cleanly with HIGH SCORE = 0.]
+**Why:** Same pattern as previous stages — flip "(not yet built)" to ✅ and harden hedged checks into specific, regression-able ones. Four new bullets the pre-stage version didn't have: the per-color POINTS values bullet (regression hook for the POINTS dict — easy to break by typo'ing a color or swapping two values), the visible-speed-differentiation bullet (regression hook for the per-color SPEED dict — same risk), the restart-re-arms-spawn-timer bullet (regression hook for the explicit `adjust_difficulty(0)` call in the restart branch — without it the new run inherits the old ramp), and the corrupt-save bullet (regression hook for the `_load_from_disk` try/except — without it a single bad save would brick startup).
+**Editor:** Claude Opus 4.7 via Cowork

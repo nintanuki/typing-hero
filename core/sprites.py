@@ -62,14 +62,14 @@ class Alien(pygame.sprite.Sprite):
     def update(self):
         """Advance one frame of motion.
 
-        Stage 5: vertical-only descent at ``AlienSettings.SPEED`` px
-        per frame. The legacy ``Alien.calculate_movement`` branched on
-        color for zigzag (yellow / blue) and stalled mid-descent for
-        the blue confusion attack; Typing Hero cuts both — aliens
-        threaten by *reaching the bottom* (``§2`` of ``docs/TODO.md``),
-        so the only motion that matters is "down." Per-color speed
-        bands and the eventual world-speed multiplier from Stage 7's
-        difficulty ramp will land here too.
+        Vertical-only descent at the per-color
+        ``AlienSettings.SPEED[self.color]`` px per frame. The legacy
+        ``Alien.calculate_movement`` branched on color for zigzag
+        (yellow / blue) and stalled mid-descent for the blue confusion
+        attack; Typing Hero cuts the confusion stall (§2) and defers
+        the yellow zigzag to Stage 8 polish (§2 update / §10) — Stage
+        7's yellow falls straight down, just faster than green so the
+        per-color difficulty contract still reads correctly.
 
         Off-screen detection is intentionally *not* done in this
         method — the main loop owns the miss callback so it can also
@@ -81,10 +81,11 @@ class Alien(pygame.sprite.Sprite):
         Returns:
             None. Mutates ``self.position`` and ``self.rect``.
         """
-        self.position.y += AlienSettings.SPEED
+        self.position.y += AlienSettings.SPEED[self.color]
         # ``round`` (vs ``int``) keeps the rect honest at the half-
         # pixel boundary — at SPEED=0.5 the alien drops 1 px every two
         # frames rather than oscillating between flooring and ceiling.
+        # The same logic applies for the other colors at their floats.
         self.rect.y = round(self.position.y)
 
     def draw_word(self, surface, font, prefix_length=0):

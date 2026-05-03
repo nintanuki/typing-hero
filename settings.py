@@ -153,33 +153,50 @@ class SpawnSettings:
 class AlienSettings:
     """Tunables for alien behavior once on screen (Stage 5+).
 
-    Stage 5 introduces vertical-only descent — no zigzag, no confusion
-    beam, no per-color motion variation. The legacy ``AlienSettings``
-    in ``legacy/settings.py`` carried per-color SPEED, ZIGZAG_THRESHOLD,
-    POINTS, drop-table chances, and a confusion-attack tunable block;
-    those land (or stay cut) in their own stages — POINTS in Stage 7,
-    per-color SPEED bands also in Stage 7 alongside Q6's color-as-
-    difficulty work, drops/confusion deferred indefinitely (§2 cuts).
+    Stage 5 introduced uniform vertical descent. Stage 7 promotes
+    ``SPEED`` to a per-color dict and adds ``POINTS`` so the four
+    colors carry distinct difficulty + reward identity (Q6 +
+    ``docs/TODO.md`` §8 O1: "be faithful to how Star Hero felt"). The
+    yellow zigzag motion and the blue confusion stall are still
+    forever-cut (§2) — only the *speed* axis lands here. Drop-table
+    chances and the confusion-attack tunable block remain cut.
     """
 
-    # Pixels per frame an alien drops, applied uniformly to all four
-    # colors at Stage 5. ``docs/TODO.md`` §5 step 1 calls for "1 px/
-    # frame at 60 FPS, tune later"; this project runs at 120 FPS, so
-    # the equivalent is 0.5 px/frame. With ``SpawnSettings.SPAWN_Y =
-    # 80`` and ``ScreenSettings.HEIGHT = 800``, an alien takes roughly
-    # (800 - 80) / 0.5 / 120 ≈ 12 s to traverse the screen — squarely
-    # in the §6 pitfall's "8–10 s window" once we account for the
-    # alien sprite extending below ``rect.top``. Stored as a float so
-    # the sub-pixel accumulator on ``Alien.position`` actually advances
-    # each frame; integer 1 (or rounding the multiply) would either
-    # double the speed or stall it depending on the path.
-    SPEED = 0.5
-    # Per-color SPEED band lives in Stage 7 (``docs/TODO.md`` Q6)
-    # alongside POINTS — both are about color-as-difficulty and want
-    # to land together so the harder-color = higher-reward contract
-    # is wired up in one pass. Pattern from the legacy class kept as
-    # a comment so the future port has a target shape:
-    #     SPEED = {'red': 0.5, 'green': 0.7, 'yellow': 0.9, 'blue': 1.1}
+    # Per-color pixels-per-frame an alien drops. Mirrors the legacy
+    # ``AlienSettings.SPEED`` shape (red slow → blue fast) but the
+    # numbers are scaled down for typing pace: legacy values were
+    # tuned for a 60-FPS shooter where you dodge bullets, not type
+    # words. At 120 FPS:
+    #   * red = 0.5  → ~12 s top-to-bottom (was 1 px/frame at 60 FPS)
+    #   * green = 0.7 → ~8.6 s
+    #   * yellow = 0.9 → ~6.7 s
+    #   * blue = 1.1 → ~5.5 s
+    # The 5.5 s window for blue assumes the player sees and starts
+    # typing immediately — for a 6-letter word that's ~1 second to
+    # read + ~4.5 s to type at ~80 WPM, so it stays catchable. Tune
+    # at Stage 7's smoke-test checkpoint if blue feels unfair.
+    # Stored as floats so ``Alien.position``'s Vector2 accumulator
+    # advances honestly at sub-pixel SPEED — the same reason Stage 5
+    # used a float for the uniform value.
+    SPEED = {
+        'red':    0.5,
+        'green':  0.7,
+        'yellow': 0.9,
+        'blue':   1.1,
+    }
+    # Per-color point values awarded on a successful kill. Same shape
+    # as legacy ``AlienSettings.POINTS`` — harder-color = more points,
+    # so the difficulty/reward contract from Q6 reads correctly:
+    # blue is fastest *and* worth the most. Values mirror legacy
+    # exactly for "be faithful" (§8 O1). ``ScoreManager.add_for_color``
+    # is the single read path so a future tuning pass changes one
+    # constant.
+    POINTS = {
+        'red':    100,
+        'green':  200,
+        'yellow': 300,
+        'blue':   500,
+    }
 
 
 class TypingSettings:
@@ -262,3 +279,52 @@ class GameOverSettings:
     # whole screen.
     BANNER_OFFSET = 40
     PROMPT_OFFSET = 30
+
+
+class ScoreSettings:
+    """Tunables for the Stage 7 score system + difficulty ramp.
+
+    Carries the run-score numbers (``DIFFICULTY_STEP``,
+    ``SPAWN_RATE_DROP``, ``MIN_SPAWN_RATE``), the on-disk save filename,
+    and the top-left HUD geometry. Mirrors legacy ``AlienSettings``
+    values where they apply — see ``docs/TODO.md`` §8 O1 ("be
+    faithful") — but lives in its own class so score concerns aren't
+    tangled with alien behavior.
+    """
+
+    # Filename for the persisted high-score / leaderboard payload.
+    # Same name as legacy so a Star Hero install's save file lands
+    # cleanly in a Typing Hero install and the high-score row reads
+    # populated from the first boot. Anchored at ``BASE_DIR`` (not
+    # ``__file__``) so the save sits at the project root rather than
+    # inside settings/, matching the legacy layout.
+    SAVE_FILENAME = 'high_score.txt'
+    SAVE_PATH = os.path.join(os.path.dirname(__file__), SAVE_FILENAME)
+
+    # Score thresholds for the difficulty ramp. Every full
+    # DIFFICULTY_STEP points the player earns, ``SpawnDirector``
+    # tightens the spawn interval by SPAWN_RATE_DROP milliseconds,
+    # clamped at MIN_SPAWN_RATE. Legacy used 5000-point steps; we
+    # keep that here because the per-color POINTS values port from
+    # legacy too, so a step-per-roughly-25-kills cadence reads the
+    # same. Re-tune at the Stage 7 smoke-test checkpoint if the
+    # ramp feels too steep or too gentle.
+    DIFFICULTY_STEP = 5000
+    # 200 ms per step is twice the legacy 25 ms because we start at
+    # 3000 ms (vs legacy 600 ms) — proportionally similar drop.
+    SPAWN_RATE_DROP = 200
+    # MIN_SPAWN_RATE is well above legacy's 150 ms because typing
+    # below ~1 word per second is brutal regardless of skill. 1200
+    # ms still gives 9 step levels (3000 → 1200) which is plenty of
+    # difficulty headroom for a v1.
+    MIN_SPAWN_RATE = 1200
+
+    # Top-left HUD geometry. Mirrors legacy ``display_in_game_score``
+    # in ``legacy/ui/style.py`` — small high-score row at (10, 5),
+    # medium current-score row at (10, 20). The two-row stack is part
+    # of the "be faithful to scoreboard" piece of §8 O1.
+    HIGH_SCORE_TOPLEFT = (10, 5)
+    SCORE_TOPLEFT = (10, 20)
+    HIGH_SCORE_SIZE = FontSettings.SMALL
+    SCORE_SIZE = FontSettings.MEDIUM
+    COLOR = ColorSettings.COLORS['WHITE']

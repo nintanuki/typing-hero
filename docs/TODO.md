@@ -38,6 +38,14 @@ Star Hero's gameplay code is tightly coupled — `Player` owns lasers, bombs, bo
 - All five laser tiers + rapid fire + rainbow beam. One word = one kill, so weapon upgrades don't translate.
 - Most powerups in their current form.
 
+**What stays from Star Hero (added on Stage 7 review):** per-color alien movement
+patterns — yellow zigzag, blue fastest, etc. — are *not* cut. The original Star
+Hero "feel" (Frankie's note: "be faithful") is a guiding principle, and the four
+alien colors carrying distinct motion is part of that feel. Per-color SPEED bands
+land in Stage 7 alongside POINTS (Q6's color-as-difficulty contract); the
+yellow zigzag and any other shape-of-motion variation lands in a follow-up step
+(see Stage 7 entry / Stage 10 polish).
+
 **What gets cut (for now, may revisit):**
 - Confusion attack (blue alien beam). Could be reimagined as letter-scrambling later.
 - Most powerups — rework them as typing-flavored buffs in a later stage.
@@ -49,12 +57,17 @@ Star Hero's gameplay code is tightly coupled — `Player` owns lasers, bombs, bo
 These are the questions we deferred. Resolve them with Frankie before starting the stage that depends on them.
 
 ### Q1. Ship behavior
-Three options on the table:
+Options on the table:
 - **(a) Static ship, laser appears on completion.** Ship sits centered at the bottom; laser shoots straight up or arcs to the targeted alien. Simplest.
 - **(b) Static ship that auto-rotates to aim at the targeted alien before firing.** Visually satisfying, more code.
 - **(c) No ship at all, laser materializes at the bottom of the screen.** Most minimal, loses some visual interest.
+- **(d) Static ship, laser spawns from the bottom and homes in on the targeted alien.** *(Added Stage 7 review.)* Frankie's read: a teleporting ship that snaps under each new target reads as jank, and any "ship moves → fires → travels → kills" animation adds delay between Enter and the kill. Spawning the laser from the bottom (or from a static ship's nose) and letting it home in keeps the kill feel snappy without the snap-around.
 
-Frankie hasn't picked. Recommend (b) as the "feels best" option but (a) is the right v1 choice — defer (b) to a polish stage.
+**Open sub-question for (d):** the homing laser still has flight time, so a fast-falling alien near the bottom might cross the screen edge before the laser reaches it. Two ways to interpret that:
+- **Soft "point of no return":** if the alien is too low when Enter fires, the laser misses (the kill is registered as a miss). The player effectively has *less* than the full screen-height to type each word — the threat zone starts above the screen edge. This adds skill depth: experienced players read the screen and prioritize bottom aliens.
+- **Always-hit:** the laser homes regardless of distance and always lands. Simpler. The "miss when off-screen bottom" rule from Stage 5 stays the only failure mode.
+
+Recommendation, parking for now: **(d) with always-hit homing for v1**, revisit "point of no return" once core loop is fun. (a) is still the cheapest v1 if (d) feels expensive; (b) is the polish version of (a).
 
 ### Q2. Word completion trigger
 - Auto-fire the moment the last letter is typed correctly?
@@ -91,6 +104,14 @@ Decision: start with 3 hearts × 1 miss each but **tune alien speed and spawn ra
 
 Tentatively: tie difficulty to alien color, since the four colors already exist in the asset set. Red = easy/short, blue = hard/long. This also gives a reason to vary point values by color.
 
+**Stage 7 update:** combined with Frankie's "be faithful to the original" note (see
+§8 Observations) and the per-color motion patterns from Star Hero, color now
+carries *three* axes of difficulty: word length (this question), fall speed
+(per-color SPEED, ported from legacy `AlienSettings.SPEED`), and motion shape
+(yellow zigzag, etc.). Stage 7 lands per-color SPEED + POINTS; the word-length
+band is deferred to Stage 10 (needs per-difficulty word lists in
+`assets/words.txt` to be split — separate work).
+
 ### Q7. Capitalization & punctuation
 **Decision:** all in-game text is displayed in UPPERCASE. This is a project-wide rule
 (see §6 pitfall "All in-game text is uppercase"): alien words, the player's typed
@@ -119,6 +140,30 @@ The blue alien's "confusion" effect (reverses controls in Star Hero) could becom
 
 ### Q10. Pause
 Does it make sense in a typing game? Pause-mid-word breaks flow. Probably keep it for accessibility (Esc / Enter), but disable it during an active typing prefix (only pausable when no word is in progress).
+
+### Q11. Word readability when many aliens are on screen
+*Raised at Stage 7 review.* At the current `WordSettings.SIZE = MEDIUM`, a 7-letter
+word is ~140 px wide — that's almost a quarter of the 600 px screen. As the
+spawn rate ramps in Stage 7 and aliens cluster, neighboring words can overlap
+and become unreadable. Options to investigate:
+- **Scale font with word length.** Shrink longer words so they all occupy roughly
+  the same on-screen width. Pro: predictable layout. Con: short words read as
+  "louder" than long words, which inverts the difficulty signal (long word
+  should *feel* harder, not smaller).
+- **Lanes.** Slow / straight-falling aliens (red, green) get assigned to one of
+  N vertical lanes at spawn. Within a lane they never overlap horizontally
+  because spawn x is locked to the lane. Yellow zigzag aliens (per Q6) drift
+  across lanes and are accepted as the "uncatchable in a lane" exception.
+- **Spawn-time x-distance check.** Reject a spawn x that's within `WORD_WIDTH`
+  pixels of any other alien at the same y-band. Cheaper than lanes; degrades
+  gracefully when many aliens are on screen (just skips that spawn tick).
+- **Vertical word offset variance.** Render some alien words above and others
+  below the sprite, so two aliens stacked vertically don't have their words
+  collide. Lightweight first pass.
+
+Recommendation, no decision: try the **spawn-time x-distance check** first — it's
+the smallest code change and addresses the worst case (two aliens spawning at
+adjacent x). If clusters at high difficulty still overlap, escalate to lanes.
 
 ---
 
@@ -267,14 +312,16 @@ Each stage is small enough to finish, run, and *see something change* in one sit
 **Tuning checkpoint.** Play it. Are misses too punishing? Adjust alien speed and spawn rate before moving on. (Q5.) Time-to-miss is currently ~12 s per alien at `AlienSettings.SPEED = 0.5`; with 3 hearts that's a generous window before the run ends. If it feels too long (run never ends in practice), bump SPEED first, then SPAWN_RATE down. If it feels too short (every miss compounds before you can read the next word), lower SPEED to 0.4.
 
 ### Stage 7 — Score + simple difficulty ramp
-**Goal:** Word kills award points. Score visible. Spawn rate (and maybe fall speed) increases as score climbs.
+**Goal:** Word kills award points (varied by alien color). Score visible top-left. Per-color fall speed lands so the four colors carry distinct motion identity. Spawn rate ramps down as score climbs.
 
 **Steps:**
 
-- [ ] 1. Port `ScoreManager` from `legacy/systems/managers.py` — keep the JSON save and initials flow if Frankie wants leaderboards.
-- [ ] 2. Award points per kill. Tentatively scale by word length (longer words = more points) or by alien color (Q6).
-- [ ] 3. Port `SpawnDirector.adjust_difficulty` skeleton — every N points, drop spawn interval by a step (clamped to a minimum). Same for fall speed.
-- [ ] 4. Smoke test: score climbs, harder over time, doesn't ramp into impossibility.
+- [ ] 1. Port `ScoreManager` from `legacy/systems/managers.py` — score field, JSON save/load to `high_score.txt`, `reset()` for new runs. **Defer the initials entry flow to Stage 9** (TODO §5 Stage 9 specifically owns "if keeping leaderboards, port `ScoreManager` initials entry path"). Stage 7 only needs the score and the high-score persistence.
+- [ ] 2. Award points per kill via `AlienSettings.POINTS[color]`. Per-color values mirror legacy (red 100, green 200, yellow 300, blue 500) — see §8 O1 ("be faithful"). Word-length bonuses (Q6's other axis) deferred to Stage 10 alongside the per-difficulty word lists.
+- [ ] 3. Promote `AlienSettings.SPEED` from a single float to a per-color dict (red < green < yellow < blue). Values scaled from legacy 60-FPS numbers down for typing pace — the harder-color = faster + more-points contract from Q6 lands here in one pass. Yellow zigzag motion (per Frankie's note 2 / §2 update) is a follow-up step deferred to Stage 8 polish; Stage 7's yellow falls straight down, just faster than green.
+- [ ] 4. Add `ScoreHUD` in `ui/hud.py` — top-left, mirrors legacy `display_in_game_score` (small high-score row, medium current-score below).
+- [ ] 5. Port `SpawnDirector.adjust_difficulty` — every `ScoreSettings.DIFFICULTY_STEP` points, drop spawn interval by `SPAWN_RATE_DROP` (clamped to `MIN_SPAWN_RATE`). Re-arm the pygame timer with `pygame.time.set_timer`. Per-frame *fall* speed scaling deferred — per-color SPEED already gives the difficulty gradient in step 3, and adding a multiplier on top makes balance tuning a two-knob problem.
+- [ ] 6. Smoke test: score climbs, high-score persists across restarts, spawn rate visibly tightens at the first difficulty step, the four colors fall at visibly different speeds, ramp tops out without becoming unplayable.
 
 ### Stage 8 — Audio + explosion polish
 **Goal:** Laser SFX on kill, explosion sprite + SFX at killed alien's position, background music.
@@ -332,8 +379,92 @@ Each stage is small enough to finish, run, and *see something change* in one sit
 - Decide whether `legacy/` should be in `.gitignore` or committed. Probably committed for now (so future-me can read it on a fresh clone), then deleted entirely once we're done.
 - Once Stage 0 lands, delete `legacy/__pycache__/` directories from disk (they're already gitignored but they're noise on local greps).
 
-## Notes
-- [ ] Try to be faithful to how the original game felt, same sound effects, visual effects, scoreboard, etc.
-- [ ] Aliens should move in patters just like the original game (yellow zig zag, blue the fastest, etc)
-- [ ] Instead of the player ship moving "teleporting" around the bottom of the screen and shooting aliens (I don't really see how else we'd depict it, any animation will be a delay between when the player presses enter, the ship moves, shoots and the alien dies) perhaps we can just have layers appear from the bottom of the screen. But then how do we handle the aliens that move? Maybe lasers can home in on them? No matter what there will still be a slight "delay" but for visual effect that is okay, that just means the player doesn't have until the alient ouches the bottom, just when they get too far for the laser to reach (there might be a point of no return) brainstorm this more.
-- [ ] Words might be too big? When the words get longer shrink them? What about when there are multiple aliens on the screen? Maybe the slow ones that move straight down should have "lanes?" so the words stay readable?
+---
+
+## 8. Observations
+
+Curated, durable design-direction notes — distilled from Frankie's brainstorming
+into a stable home so future passes don't have to re-derive them. Each entry is
+a guiding principle that influences several stages, not a single-stage TODO.
+
+### O1. Be faithful to how Star Hero *felt*
+The "feel" of the original game is a guiding principle, not just nostalgia:
+the same sound effects on the same beats, the same visual effects (CRT,
+explosions, the four alien colors), and a scoreboard that reads in the same
+visual slot. Concretely, this means:
+- **SFX:** reuse the legacy `assets/audio/` files — laser, explosion, alarms,
+  unpause cue. Don't rescore. Stage 8.
+- **Visuals:** keep the CRT shader, the scrolling starfield, the alien-color
+  palette, the explosion spritesheet. All ports, no redesigns.
+- **Scoreboard:** top-left score readout (legacy `display_in_game_score`) and
+  the high-score / leaderboard layout from `legacy/ui/style.py`. Stage 7 / 9.
+- **Per-color alien identity:** red / green / yellow / blue are not
+  interchangeable. Each color has its own *speed*, its own *motion pattern*,
+  its own *point value*, and (eventually) its own *word-difficulty band* — and
+  the relationships between them (yellow zigzags, blue is fastest) port from
+  Star Hero verbatim. See §2 / Q6 / Stage 7.
+
+### O2. Snappy kill feel beats elaborate kill animation
+Frankie's read on the ship behavior question (Q1): any sequence of "ship
+moves under target → fires → laser travels → alien dies" introduces delay
+between the player pressing Enter and the alien being destroyed. That delay
+is more punishing than a simpler-looking kill. The chosen direction (Q1
+option d) — laser spawns from the bottom and homes — keeps the visual
+narrative ("you fired, it hit, it died") without making the player wait for
+ship choreography. *Slight* travel time is fine and even desirable for the
+"point of no return" mechanic; multi-step ship animation is not.
+
+### O3. The screen has a finite readable budget
+At spawn cadences the typing-game can sustain (Stage 7 difficulty ramp), the
+screen will accumulate enough aliens that *word readability* becomes the
+limiting factor before reflexes do. Future stages need to defend layout
+explicitly — see Q11. This is a "design has implications" note, not a "do this
+now" note: it informs spawn placement, font sizing, and any future word-length
+distribution choices.
+
+---
+
+## 9. Issues
+
+Concrete problems observed in the running game (or known to be lurking) that
+need a fix in a future stage. Distinct from §3 (Open design questions, where
+the *design* is unresolved) and §6 (Pitfalls, which are gotchas to remember,
+not bugs). Move items here when they're actionable bugs / layout problems /
+balance complaints, not when they're still open questions.
+
+*(None yet at Stage 7 start. The Q11 word-readability concern lives in §3 as a
+design question rather than here because the *behavior* isn't observed-broken
+yet — the spawn rate at 3000 ms is currently slow enough that overlap is rare.
+Promote to §9 once Stage 7's faster spawn rates make it visible.)*
+
+---
+
+## 10. Brainstorm scratch
+
+Free-form brainstorming dump for Frankie. Drop raw thoughts here without
+worrying about organization — each pass, the working session promotes them
+into §3 (questions), §8 (observations), §9 (issues), or directly into a
+stage's plan. Items that have been promoted get checked off and stay here as
+a paper trail; items still raw stay un-checked.
+
+- [x] Try to be faithful to how the original game felt, same sound effects,
+  visual effects, scoreboard, etc. → **promoted to §8 O1.**
+- [x] Aliens should move in patterns just like the original game (yellow
+  zigzag, blue the fastest, etc). → **promoted to §2 ("What stays from Star
+  Hero, added on Stage 7 review") + Q6 update + Stage 7 plan (per-color SPEED
+  + POINTS) + Stage 10 (zigzag motion port).**
+- [x] Instead of the player ship moving / "teleporting" around the bottom of
+  the screen and shooting aliens — any animation is a delay between Enter and
+  the kill — perhaps lasers just appear from the bottom of the screen and
+  home in on moving aliens. There will still be a slight "delay" but for
+  visual effect that is okay. The player doesn't have until the alien
+  *touches* the bottom, just until it's *too far for the laser to reach*
+  (point of no return). → **promoted to Q1 (new option d + sub-question on
+  point-of-no-return) + §8 O2.**
+- [x] Words might be too big? When words get longer, shrink them? What
+  about when there are multiple aliens on screen — should the slow
+  straight-down movers have lanes so the words stay readable? → **promoted to
+  Q11.**
+
+*(Add new raw notes below this line — anything goes. Future passes will
+organize them.)*

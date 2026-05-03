@@ -70,13 +70,18 @@ Run the relevant section after every change. Each stage in [`TODO.md`](TODO.md) 
 * `Enter` from the game-over screen clears all on-screen aliens, refills hearts to `HeartSettings.MAX`, kicks a fresh first-frame spawn (so the restarted run isn't blank for `SPAWN_RATE` ms — same behavior as the boot-time first-frame spawn from Stage 4), and flips `game_active` back on
 * `ESC` still closes the window cleanly from both the live-run state and the game-over state
 
-## Stage 7 — Score + difficulty ramp (not yet built)
+## Stage 7 — Score + difficulty ramp ✅
 
 * All previous checks still pass
-* Score increments per word killed, visible on the HUD
-* High score persists across runs (JSON save from legacy `ScoreManager`)
-* Spawn rate visibly increases as score climbs (clamped to a minimum interval)
-* Game does not become unplayable — the ramp tops out at "challenging but doable"
+* `SCORE: 0` and `HIGH SCORE: <persisted>` both render in the top-left at boot — small `HIGH SCORE` row at the very top, medium `SCORE` row directly below; both uppercase per Q7
+* Killing a red alien adds 100, green adds 200, yellow adds 300, blue adds 500 — verifiable by typing one word of each color and watching the readout step
+* The four alien colors fall at visibly different speeds: red slowest (~12 s top-to-bottom), green medium (~9 s), yellow faster (~7 s), blue fastest (~5–6 s) — easy to confirm by spawning a few of each and watching them reach the bottom in order
+* On crossing the first `ScoreSettings.DIFFICULTY_STEP` threshold (5000 points), the spawn interval visibly tightens (3000 ms → 2800 ms = a noticeable bump in cadence), and again at each subsequent 5000-point step until clamped at `MIN_SPAWN_RATE` (1200 ms)
+* The ramp tops out at "challenging but doable" — at full ramp (12000+ score, ~1200 ms between spawns) the screen is busy but a competent typist can keep up
+* On game-over, the score is written to `high_score.txt` at the project root — verifiable by looking at the file after death
+* If the just-finished run beat the previous high score, the next boot reads it back: the `HIGH SCORE` row in the top-left shows the new record from the title frame onward
+* Pressing Enter from the game-over screen zeroes `SCORE` (high score row stays) *and* re-arms the spawn timer to the base 3000 ms — the restarted run starts at the easy cadence even if the previous run was at full ramp
+* If `high_score.txt` is missing (fresh install) or corrupt, boot proceeds without crashing — the `HIGH SCORE` row reads `0` until the first run completes
 
 ## Stage 8 — Audio + explosion (not yet built)
 

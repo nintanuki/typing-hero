@@ -1,17 +1,15 @@
 """Alien spawning driver.
 
-Stage 4 introduces ``SpawnDirector`` — a minimal port of the legacy
+Stage 4 introduced ``SpawnDirector`` — a minimal port of the legacy
 Star Hero class of the same name (``legacy/systems/managers.py``). The
-legacy version also handled alien-fired lasers, drop-table rolls, and
-score-driven difficulty scaling; Typing Hero keeps only the part that
-matters here: own one ``pygame`` custom event, fire it on a timer, and
-push a fresh alien onto the screen each tick.
+legacy version also handled alien-fired lasers and drop-table rolls;
+Typing Hero stays cut on those (§2). Stage 7 adds the third leg of the
+legacy class — score-driven difficulty scaling via
+``adjust_difficulty`` — so the spawn interval visibly tightens as the
+player's score climbs.
 
-Difficulty scaling (shrinking the spawn interval as the score climbs)
-is a Stage 7 concern. Movement (so the spawn origin can move above the
-top of the screen and aliens fall *into* view) is Stage 5. Until those
-land, the director's job is exactly: pick a color, pick a word, pick an
-x, hand the alien to the sprite group.
+Movement (the per-frame fall) lives on ``Alien.update``; the director
+only knows about *when* aliens appear, not what they do once on screen.
 """
 
 import random
@@ -19,7 +17,7 @@ import random
 import pygame
 
 from core.sprites import Alien
-from settings import ScreenSettings, SpawnSettings
+from settings import ScoreSettings, ScreenSettings, SpawnSettings
 
 
 class SpawnDirector:
@@ -86,3 +84,46 @@ class SpawnDirector:
             ScreenSettings.WIDTH - SpawnSettings.X_MARGIN,
         )
         aliens.add(Alien(color=color, pos=(x, SpawnSettings.SPAWN_Y), word=word))
+
+    def adjust_difficulty(self, score):
+        """Re-arm the spawn timer based on the current score.
+
+        Every full ``ScoreSettings.DIFFICULTY_STEP`` points the player
+        has earned, the spawn interval drops by
+        ``ScoreSettings.SPAWN_RATE_DROP`` ms, clamped at
+        ``ScoreSettings.MIN_SPAWN_RATE`` so the ramp can't run away
+        into unplayability. Mirrors the legacy
+        ``SpawnDirector.adjust_difficulty`` shape but only the spawn-
+        timer leg — alien-fired lasers and the background-scroll
+        speedup are forever-cut (§2 / §6 cuts).
+
+        Called from ``main.py`` on every successful kill (score
+        changes), not on a timer of its own — that keeps the ramp
+        deterministic ("at exactly N points, spawns are M ms apart")
+        and avoids the legacy footgun where two timers could fight
+        each other on a frame ScoreManager and SpawnDirector
+        disagreed about the current score.
+
+        Args:
+            score (int): Current run score from
+                ``ScoreManager.score``. Negative scores are not
+                expected (no penalties at Stage 7) but would clamp to
+                step=0 via the floor division anyway.
+
+        Returns:
+            int: The new spawn interval in ms — useful for tests /
+            debugging. The pygame timer is also re-armed in-place as
+            a side effect.
+        """
+        steps = max(0, score) // ScoreSettings.DIFFICULTY_STEP
+        new_rate = max(
+            ScoreSettings.MIN_SPAWN_RATE,
+            SpawnSettings.SPAWN_RATE - (steps * ScoreSettings.SPAWN_RATE_DROP),
+        )
+        # ``set_timer`` replaces the existing timer for ``spawn_event``
+        # with the new interval; the next post happens ``new_rate`` ms
+        # from now, not ``new_rate`` ms from the *previous* tick. That
+        # gives a small "jitter" at each step boundary which reads as
+        # natural pacing rather than a visible cadence shift.
+        pygame.time.set_timer(self.spawn_event, new_rate)
+        return new_rate
