@@ -59,13 +59,16 @@ Run the relevant section after every change. Each stage in [`TODO.md`](TODO.md) 
 * If a *non-targeted* alien falls off, the active lock is undisturbed (verifiable by typing partway into one alien's word, then letting an unrelated alien fall: the cyan/white split on the locked alien stays exactly as it was)
 * Aliens still spawn at `SpawnSettings.SPAWN_Y = 80` so the word floating above is fully on-screen from the moment of spawn (Stage 4 first-frame-spawn check still passes)
 
-## Stage 6 — Hearts + game over (not yet built)
+## Stage 6 — Hearts + game over ✅
 
 * All previous checks still pass
-* Hearts HUD renders in the top-right (carry-over from legacy `style.py`)
-* Each miss decrements one heart
-* At zero hearts, gameplay stops and a "GAME OVER — press Enter to restart" screen appears
-* `Enter` from the game-over screen resets hearts, clears aliens, and starts a fresh run
+* Hearts HUD renders in the top-right starting at `HeartSettings.MAX` icons (3) — row pinned to the right edge with `RIGHT_MARGIN` clearance, `SPACING` between adjacent hearts, sitting `TOP_MARGIN` below the screen top
+* Each miss decrements one heart from the *left* of the row (rightmost icon is the last to disappear) — verifiable by letting three aliens fall in a row and watching the row shrink one slot per miss
+* At zero hearts the run flips into game-over: `aliens.update()` and the miss-detection loop both pause (any aliens still on screen freeze in place rather than vanish), the spawn timer keeps ticking but every tick is silently dropped, the typing buffer + hearts HUD both stop drawing, and a centered "GAME OVER" banner + "PRESS ENTER TO RESTART" prompt overlay draws on top of the frozen playfield
+* The active typing lock (if any) is cleared the moment hearts hit zero, so the game-over screen never shows a leftover cyan prefix on a frozen alien
+* On the game-over screen, every key except `Enter` and `ESC` is ignored — letter taps don't plant a half-typed prefix that'd carry over into the next run
+* `Enter` from the game-over screen clears all on-screen aliens, refills hearts to `HeartSettings.MAX`, kicks a fresh first-frame spawn (so the restarted run isn't blank for `SPAWN_RATE` ms — same behavior as the boot-time first-frame spawn from Stage 4), and flips `game_active` back on
+* `ESC` still closes the window cleanly from both the live-run state and the game-over state
 
 ## Stage 7 — Score + difficulty ramp (not yet built)
 

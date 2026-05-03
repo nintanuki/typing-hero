@@ -200,3 +200,60 @@ class TypingSettings:
     # exists so a stray keyboard repeat or paste doesn't grow the
     # rendered surface unbounded across the screen.
     MAX_LENGTH = 32
+
+
+class HeartSettings:
+    """Tunables for the player-health HUD ported in Stage 6.
+
+    Carries the hearts-row geometry from the legacy ``UISettings`` block
+    (``HEART_TOP_MARGIN``, ``HEART_RIGHT_MARGIN``, ``HEART_SPACING``) and
+    adds ``MAX`` for the starting heart count. The legacy class also held
+    boost-meter / status-row / bombs-row constants — those are forever-
+    cut per ``docs/TODO.md`` §2 and don't make the trip.
+    """
+
+    # Starting (and maximum) hearts. Q5 resolved as "3 hearts × 1 miss
+    # each" paired with the slow ``AlienSettings.SPEED`` that gives a
+    # ~12 s window per alien — three misses worth of slow descent reads
+    # as forgiving without removing the threat. Stage 6's tuning
+    # checkpoint revisits if play-testing says otherwise.
+    MAX = 3
+    # Pixels between the top of the screen and the top of the heart
+    # icons. Matches legacy ``UISettings.HEART_TOP_MARGIN`` so the row
+    # sits in the same visual slot players who knew Star Hero are used
+    # to (and so the asset still reads as "hearts" without re-tuning).
+    TOP_MARGIN = 8
+    # Pixels between the rightmost heart and the screen's right edge.
+    # Matches legacy ``UISettings.HEART_RIGHT_MARGIN``.
+    RIGHT_MARGIN = 30
+    # Pixels between adjacent hearts in the row. Matches legacy
+    # ``UISettings.HEART_SPACING``.
+    SPACING = 10
+
+
+class GameOverSettings:
+    """Tunables for the minimal Stage 6 game-over overlay.
+
+    Stage 6 only needs the banner + a "press Enter to restart" prompt so
+    the run-loop can close. The richer game-over screen (final score,
+    high-score, initials entry) lands in Stage 9 alongside the intro
+    screen and the ``SessionStateManager`` port — at which point this
+    class likely gets folded into a broader ``MenuSettings``.
+    """
+
+    # Banner text + size. LARGE matches the legacy game-over banner and
+    # reads as the dominant element of the screen at this font.
+    BANNER_TEXT = "GAME OVER"
+    BANNER_SIZE = FontSettings.LARGE
+    # Restart-prompt text + size. MEDIUM is a step down from BANNER so
+    # the banner stays the heading and the prompt reads as instruction.
+    PROMPT_TEXT = "PRESS ENTER TO RESTART"
+    PROMPT_SIZE = FontSettings.MEDIUM
+    COLOR = ColorSettings.COLORS['WHITE']
+    # Pixels the banner sits *above* screen center, and the prompt sits
+    # *below*. Centering both around CENTER (rather than stacking from
+    # the top) keeps the overlay vertically balanced so the eye lands
+    # on the banner first and the prompt second without scanning the
+    # whole screen.
+    BANNER_OFFSET = 40
+    PROMPT_OFFSET = 30

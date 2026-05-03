@@ -962,3 +962,169 @@ Stage 5 of the build plan lands: aliens now descend each frame at `AlienSettings
      spawned aliens fully visible.]
 **Why:** Same pattern as TODO — flip "(not yet built)" to ✅ and harden hedged checks into definite ones. Three new bullets the pre-stage version didn't have: the smoothness check (regression hook for the float position — if a future change collapses Vector2 back to int rect, this will fail visibly), the untargeted-alien-preserves-lock check (regression hook for the `is` identity branch — easy to break by accidentally clearing on every miss), and the SPAWN_Y-still-visible check (regression hook for the §5 decision to *not* push spawn_y negative; a future session re-reading the Stage 4 hint might "fix" it back to negative without realizing word readability was the reason).
 **Editor:** Claude Opus 4.7 via Cowork
+
+## 2026-05-03 16:46 UTC — Stage 6 (hearts + game over)
+
+Stage 6 of the build plan lands: runs now end. The player has `HeartSettings.MAX` hearts; each missed alien (Stage 5's `print("miss")` branch) decrements one. At zero, the loop flips `game_active` to `False` — `aliens.update()`, miss-detection, the spawn-event handler, and typing input all gate off; any active typing lock clears; aliens still on screen freeze in place; and a centered "GAME OVER — press Enter to restart" overlay draws on top of the frozen playfield. Pressing Enter from that state clears the alien group, refills hearts, kicks a fresh first-frame spawn, and flips the run back on. Heart rendering ports from `legacy/ui/style.py` `display_hearts` into a new `ui/hud.py` (also home to the minimal `GameOverScreen`); the legacy `Style` god-object's other responsibilities (title, ship, boost meter, bombs row, volume bar, leaderboard, score readout) all stay in `legacy/` and arrive in their proper stages.
+
+**File:** settings.py
+**Date and Time:** 2026-05-03 16:46 UTC
+**Lines (at time of edit):** 205-259 (two new classes appended after `TypingSettings`)
+**Before:**
+    class TypingSettings:
+        ...
+        MAX_LENGTH = 32
+    [end of file]
+**After:**
+    class TypingSettings:
+        ...
+        MAX_LENGTH = 32
+
+
+    class HeartSettings:
+        """Tunables for the player-health HUD ported in Stage 6."""
+        MAX = 3
+        TOP_MARGIN = 8
+        RIGHT_MARGIN = 30
+        SPACING = 10
+
+
+    class GameOverSettings:
+        """Tunables for the minimal Stage 6 game-over overlay."""
+        BANNER_TEXT = "GAME OVER"
+        BANNER_SIZE = FontSettings.LARGE
+        PROMPT_TEXT = "PRESS ENTER TO RESTART"
+        PROMPT_SIZE = FontSettings.MEDIUM
+        COLOR = ColorSettings.COLORS['WHITE']
+        BANNER_OFFSET = 40
+        PROMPT_OFFSET = 30
+**Why:** Two new classes, both per the Refactoring Rule "no magic numbers." `HeartSettings` mirrors the legacy `UISettings.HEART_*` geometry exactly (`TOP_MARGIN = 8`, `RIGHT_MARGIN = 30`, `SPACING = 10`) so the row sits in the same visual slot Star Hero players knew — no re-tuning needed, the asset already reads as "hearts." `MAX = 3` resolves Q5 ("3 hearts × 1 miss each"); paired with the slow `AlienSettings.SPEED = 0.5` from Stage 5 that gives a ~12 s window per alien, three misses is forgiving without removing the threat. The legacy class also held boost-meter / status-row / bombs-row constants — those are forever-cut per §2 and don't make the trip. `GameOverSettings` is a new namespace because the game-over overlay is a distinct concern from the in-run HUD; Stage 9's intro/menu/initials port likely folds it into a broader `MenuSettings` then. `BANNER_OFFSET` / `PROMPT_OFFSET` measure from screen center (rather than from the top) so the overlay reads as vertically balanced — eye lands on the banner first, prompt second, no scanning the whole screen. Banner at LARGE / prompt at MEDIUM keeps the banner the heading and the prompt the instruction without either being overwhelming.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** ui/hud.py
+**Date and Time:** 2026-05-03 16:46 UTC
+**Lines (at time of edit):** 1-135 (new file)
+**Before:**
+    (file did not exist)
+**After:**
+    """HUD overlays: hearts row + the Stage 6 game-over banner."""
+
+    import pygame
+    from settings import (AssetPaths, FontSettings, GameOverSettings,
+                          HeartSettings, ScreenSettings)
+
+    class HeartsHUD:
+        def __init__(self):
+            self.heart_surf = pygame.image.load(AssetPaths.HEART).convert_alpha()
+            self._heart_width = self.heart_surf.get_width()
+            self._row_left_x = ScreenSettings.WIDTH - (
+                self._heart_width * HeartSettings.MAX + HeartSettings.RIGHT_MARGIN
+            )
+
+        def draw(self, surface, hearts):
+            hearts = max(0, min(hearts, HeartSettings.MAX))
+            for index in range(hearts):
+                x = self._row_left_x + index * (
+                    self._heart_width + HeartSettings.SPACING
+                )
+                surface.blit(self.heart_surf, (x, HeartSettings.TOP_MARGIN))
+
+    class GameOverScreen:
+        def __init__(self):
+            banner_font = pygame.font.Font(FontSettings.FONT, GameOverSettings.BANNER_SIZE)
+            prompt_font = pygame.font.Font(FontSettings.FONT, GameOverSettings.PROMPT_SIZE)
+            self._banner_surf = banner_font.render(
+                GameOverSettings.BANNER_TEXT.upper(), True, GameOverSettings.COLOR)
+            self._prompt_surf = prompt_font.render(
+                GameOverSettings.PROMPT_TEXT.upper(), True, GameOverSettings.COLOR)
+            cx, cy = ScreenSettings.CENTER
+            self._banner_rect = self._banner_surf.get_rect(
+                center=(cx, cy - GameOverSettings.BANNER_OFFSET))
+            self._prompt_rect = self._prompt_surf.get_rect(
+                center=(cx, cy + GameOverSettings.PROMPT_OFFSET))
+
+        def draw(self, surface):
+            surface.blit(self._banner_surf, self._banner_rect)
+            surface.blit(self._prompt_surf, self._prompt_rect)
+**Why:** TODO Stage 6 steps 1 + 3, ported from `legacy/ui/style.py` `display_hearts` and `display_game_over`. Notes:
+ * **`HeartsHUD` is a class, not a free function**, because the heart sprite + the row's leftmost x are both per-instance state worth caching across frames — making the constructor own the `pygame.image.load` and the row-x arithmetic means the per-frame `draw` is a tight loop with one multiplication and one blit per heart. A free `display_hearts(surface, count, sprite)` would force the caller to pass the sprite in (or load it every call); the class encapsulates that better.
+ * **The row's leftmost x is computed from the sprite's *actual* pixel width** (`self.heart_surf.get_width()`) rather than from a `HeartSettings.SPRITE_WIDTH` constant. Same approach the legacy `display_hearts` used — if the asset gets re-sized later, the row stays pinned to the right edge without re-tuning. The legacy `UISettings.HEART_SPRITE_SIZE = (24, 24)` was actually wrong (the real `heart.png` is 32×32) and was never read by `display_hearts` for the row math anyway, so the new code skips that constant entirely.
+ * **Defensive clamp `max(0, min(hearts, MAX))`** — if `main.py` ever subtracts past zero before the game-over branch fires (it shouldn't, the `<= 0` check is in the same frame, but defense in depth), we render an empty row instead of looping with a negative `range` or a wraparound positive.
+ * **`GameOverScreen` pre-rasterizes both surfaces at construction.** The text never changes between frames, so paying `font.render` twice at boot is strictly better than re-rendering each tick. Both rects are also pre-computed; the per-frame `draw` is two blits with no arithmetic.
+ * **`.upper()` on both `BANNER_TEXT` and `PROMPT_TEXT`** even though the source strings in `GameOverSettings` are already uppercase — belt-and-suspenders threading of the project-wide rule (Q7) at every `font.render` call site, so a future edit to lower-case source text can't accidentally render mixed-case.
+ * **Both classes co-located in `hud.py`** rather than splitting into `hud.py` + `game_over.py` — keeps `ui/` lean while only two HUD pieces exist; Stage 9's intro/menus port likely splits this then.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** main.py
+**Date and Time:** 2026-05-03 16:46 UTC
+**Lines (at time of edit):** 1-238 (rewritten)
+**Before:**
+    """Typing Hero entry point. Stage 5 scaffold..."""
+    [event pump → aliens.update() → miss scan (print "miss" only) →
+     fill → draw aliens → draw_word per alien → optional buffer blit →
+     flip → tick.]
+**After:**
+    """Typing Hero entry point. Stage 6 scaffold..."""
+    [Adds: HeartSettings + HeartsHUD + GameOverScreen imports;
+     hearts_hud = HeartsHUD(); game_over_screen = GameOverScreen();
+     hearts = HeartSettings.MAX; game_active = True;
+     spawn-event handler gated on game_active;
+     KEYDOWN routes split into two branches: game_active (existing
+     RETURN/BACKSPACE/letter handling) vs. !game_active (Enter only,
+     restarts the run);
+     aliens.update() + miss scan wrapped in `if game_active:`;
+     miss scan now decrements hearts, ends the run at <= 0, breaks out
+     of the in-frame loop;
+     render: hearts_hud.draw(screen, hearts) + buffer blit only when
+     game_active, else game_over_screen.draw(screen).]
+**Why:** TODO Stage 6 steps 2 + 4 + 5 (wiring + restart + smoke test). Notes:
+ * **`hearts` and `game_active` are locals in `run()`, not on a manager.** The temptation was to introduce `SessionStateManager` here so the gating concern lived in one place — but the legacy version of that class also owns intro music + pause routing + the "first frame after restart" arrow, all of which are Stage 9 concerns. Pre-wiring it now would mean writing a stub that does almost nothing, then rewriting it in Stage 9 once the other states arrive. Two locals are good enough for one stage; Stage 9 pulls them onto the manager.
+ * **Spawn-event handler gated on `game_active`** — the timer keeps ticking on the game-over screen but every tick is silently dropped. Restarting picks up the same cadence without re-arming `pygame.time.set_timer`. Could alternatively call `set_timer(spawn_event, 0)` to disarm and re-arm on restart, but the gate is simpler and there's no observable difference.
+ * **KEYDOWN routes split into two branches.** During a live run, the existing Stage 3 routing (RETURN commits, BACKSPACE shrinks, isalpha extends) holds. On the game-over screen, only Enter does anything — other keys drop silently so a player still tapping at the keyboard when they died can't accidentally plant a half-typed prefix that'd carry over into the next run. ESC still quits from either state because its branch is checked before the `game_active` split.
+ * **Restart order:** clear alien group (`for alien in list(aliens): alien.kill()` so the playfield reads fresh — `aliens.empty()` would also work but the per-sprite `.kill()` matches how aliens leave the group everywhere else and keeps any future on-kill hooks live) → clear lock (idempotent — already cleared at game-over) → refill hearts → kick a fresh first-frame spawn (matches the Stage 4 boot-time first-frame-spawn behavior so the restarted run isn't blank for `SPAWN_RATE` ms) → flip `game_active` back on.
+ * **`aliens.update()` + miss scan wrapped in `if game_active:`** — on the game-over screen, aliens still on screen freeze in place because we don't call update. The render path still draws them, so the frozen scene reads as "this is the run you just finished" — more informative than a black background and closer to the legacy game-over feel.
+ * **Miss scan ordering: lock-clear → kill → print → decrement → game-over check → break.** The `break` is new — once the run is over in this frame, additional misses don't matter and shouldn't print extra "miss" lines or further decrement past zero. The `print("miss")` from Stage 5 stays for smoke-test parity; Stage 8's audio hook will replace it.
+ * **Hearts row + typing buffer both gate on `game_active`.** Drawing zero hearts is a no-op anyway (the `for index in range(0)` loop runs zero times), but the explicit gate makes the "playfield + HUD vs. game-over banner" split readable. The typing buffer needs to gate too — even though we clear the lock on game-over, skipping the blit is cheaper than running it on an empty string and saves one branch of the buffer-render code.
+ * **`HeartsHUD` and `GameOverScreen` constructed *after* `pygame.display.set_mode`** because `convert_alpha` requires an active display. Same constraint as `Alien.__init__`'s sprite load.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** docs/TODO.md
+**Date and Time:** 2026-05-03 16:46 UTC
+**Lines (at time of edit):** Stage 6 heading + 5 step boxes + new resolution paragraphs
+**Before:**
+    ### Stage 6 — Hearts + game over
+    [5 unchecked step boxes]
+    **Tuning checkpoint.** Play it. Are misses too punishing? ...
+**After:**
+    ### Stage 6 — Hearts + game over ✅
+    [5 checked step boxes]
+    **Resolution this stage:** the heart-rendering port lives in
+    a new ui/hud.py as HeartsHUD... GameOverScreen pre-rasterizes
+    the banner + prompt at construction... co-locating both in
+    hud.py rather than splitting hud.py + game_over.py keeps
+    ui/ lean while only two HUD pieces exist...
+    **`hearts` + `game_active` live in main.py, not on a manager**...
+    **Miss path order matters**...
+    **Tunables landed:** HeartSettings (MAX=3, TOP_MARGIN=8,
+    RIGHT_MARGIN=30, SPACING=10) and GameOverSettings...
+    **Tuning checkpoint.** [unchanged, plus concrete numbers]
+**Why:** Same convention as Stage 0/1/2/3/4/5 entries — flip checkboxes, add ✅ to the heading, replace the open-question / next-stage hints with a "what we actually decided / what we built" set of paragraphs so a future session reading the TODO cold sees the resolutions inline. Sub-paragraphs cover the meaningfully separate decisions of this stage: where the HUD code lives (new `ui/hud.py` co-locating both pieces), where the run-state lives (locals in `run()` rather than a premature `SessionStateManager`), the miss-path ordering subtlety (lock-clear → kill → print → decrement → break), and the tunable inventory.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** docs/TESTING.md
+**Date and Time:** 2026-05-03 16:46 UTC
+**Lines (at time of edit):** 62-69 (Stage 6 section)
+**Before:**
+    ## Stage 6 — Hearts + game over (not yet built)
+    [5 generic bullets covering hearts HUD, decrement on miss,
+     game-over screen at zero, Enter restart]
+**After:**
+    ## Stage 6 — Hearts + game over ✅
+    [9 specific bullets — hearts row geometry pinned right with
+     RIGHT_MARGIN/SPACING/TOP_MARGIN, leftmost-empties-first
+     direction, freeze-aliens-on-game-over behavior, lock-clear
+     on game-over, non-Enter keys ignored on game-over screen,
+     Enter restart with first-frame spawn parity, ESC quits
+     from either state.]
+**Why:** Same pattern as TODO — flip "(not yet built)" to ✅ and harden hedged checks into definite ones. Four new bullets the pre-stage version didn't have: the row-direction check (regression hook for the leftmost-empties-first rendering — easy to flip by accident if a future refactor mirrors the loop), the freeze-aliens-on-game-over check (regression hook for the `if game_active:` gate around `aliens.update()` — easy to break by hoisting the update outside the gate), the non-Enter-keys-ignored check (regression hook for the two-branch KEYDOWN split), and the lock-cleared-on-game-over check (regression hook for the explicit `word_manager.clear_lock()` call in the hearts-hit-zero branch — without it the game-over screen would still show a stale cyan prefix on the frozen alien that took the last heart).
+**Editor:** Claude Opus 4.7 via Cowork

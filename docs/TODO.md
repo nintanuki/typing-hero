@@ -245,18 +245,26 @@ Each stage is small enough to finish, run, and *see something change* in one sit
 
 **`Alien.update()` is its own function, not folded into `draw_word`.** Per the Refactoring Rule "Keep functions organized and grouped by role; the `update` and `run` functions ... do as little as possible — only call other functions if possible." Stage 5's `update` is a 2-liner today; Stages 7 (difficulty multiplier) and 8 (frame-cycle animation) will grow it by adding more *calls*, not more inline logic.
 
-### Stage 6 — Hearts + game over
+### Stage 6 — Hearts + game over ✅
 **Goal:** Hearts HUD in top-right. Each miss removes one. Zero hearts → game over screen → restart.
 
 **Steps:**
 
-- [ ] 1. Port heart rendering from `legacy/ui/style.py` (`display_hearts`).
-- [ ] 2. Add a `hearts` counter in main; decrement on miss. At zero, set `game_active = False`.
-- [ ] 3. Show a minimal "GAME OVER — press Enter to restart" screen.
-- [ ] 4. On Enter from game-over, reset hearts, clear aliens, set `game_active = True`.
-- [ ] 5. Smoke test: misses subtract hearts; at zero, game-over appears; Enter restarts.
+- [x] 1. Port heart rendering from `legacy/ui/style.py` (`display_hearts`).
+- [x] 2. Add a `hearts` counter in main; decrement on miss. At zero, set `game_active = False`.
+- [x] 3. Show a minimal "GAME OVER — press Enter to restart" screen.
+- [x] 4. On Enter from game-over, reset hearts, clear aliens, set `game_active = True`.
+- [x] 5. Smoke test: misses subtract hearts; at zero, game-over appears; Enter restarts.
 
-**Tuning checkpoint.** Play it. Are misses too punishing? Adjust alien speed and spawn rate before moving on. (Q5.)
+**Resolution this stage:** the heart-rendering port lives in a new `ui/hud.py` as `HeartsHUD` — a small class that loads `assets/graphics/heart.png` once at construction and on each frame walks the row left-to-right blitting one icon per remaining heart. Mirrors `legacy/ui/style.py` `display_hearts` but stripped of the `Style` god-object it was a method on (legacy `Style` also drew the title, the player ship, the boost meter, the bombs row, the volume bar, the leaderboard, the score readout — Stage 6 needs none of those). The same module also gets a `GameOverScreen` class that pre-rasterizes the "GAME OVER" banner and "PRESS ENTER TO RESTART" prompt at construction so the per-frame draw is two pure blits — the text never changes between frames, so paying `font.render` once at boot is strictly better than redoing it every tick. **Co-locating both in `hud.py`** rather than splitting `hud.py` + `game_over.py` keeps `ui/` lean while only two HUD pieces exist; Stage 9's intro/game-over port likely splits this into `hud.py` (in-game) + `menus.py` (overlays) once the intro screen, score/high-score readouts, and initials entry land.
+
+**`hearts` + `game_active` live in `main.py`, not on a manager.** The temptation was to introduce `SessionStateManager` here so the gating concern lived in one place — but the legacy version of that class also owns intro music + pause routing + the "first frame after restart" arrow, all of which are Stage 9 concerns. Pre-wiring it now would mean writing a stub that does almost nothing, then rewriting it in Stage 9 once the other states arrive. Two locals on `run()` are good enough for one stage; Stage 9's `SessionStateManager` port pulls the flag in then. **Spawn timer keeps ticking on game-over** but the spawn handler is gated on `game_active` — restarting picks up the same cadence without re-arming, and the next on-game-over tick is silently dropped. **Aliens freeze in place behind the banner** rather than disappearing because we still call `aliens.draw(screen)` and `draw_word(...)` while skipping `aliens.update()`; the frozen scene reads as "this is the run you just finished" which is more informative than a black background. **Restart order:** clear alien group → clear lock (idempotent — already cleared at game-over) → refill hearts → kick a fresh first-frame spawn → flip `game_active` back on. Matches the Stage 4 first-frame-spawn behavior so the restarted run isn't blank for `SPAWN_RATE` ms. **Game-over keypress filter** ignores everything except Enter and ESC — a player still tapping at the keyboard when they died can't accidentally plant a half-typed prefix that'd carry over into the next run.
+
+**Miss path order matters.** Inside the `for alien in list(aliens):` scan: lock-clear → `alien.kill()` → `print("miss")` → `hearts -= 1` → check for game-over → `break`. The `break` is new — once the run is over, additional misses in the same frame don't matter and shouldn't print extra "miss" lines or further decrement past zero. The `print("miss")` Stage 5 placeholder stays for now (smoke-test parity); Stage 8's audio hook will replace it with a SFX cue.
+
+**Tunables landed:** `HeartSettings` (MAX = 3, TOP_MARGIN = 8, RIGHT_MARGIN = 30, SPACING = 10 — geometry mirrors legacy `UISettings.HEART_*` exactly so the row sits in the same visual slot Star Hero players were used to), and `GameOverSettings` (BANNER_TEXT = "GAME OVER" at LARGE, PROMPT_TEXT = "PRESS ENTER TO RESTART" at MEDIUM, BANNER_OFFSET = 40 above center, PROMPT_OFFSET = 30 below center). The legacy `UISettings` carried boost-meter / status-row / bombs-row constants too — those are forever-cut per §2 and don't make the trip.
+
+**Tuning checkpoint.** Play it. Are misses too punishing? Adjust alien speed and spawn rate before moving on. (Q5.) Time-to-miss is currently ~12 s per alien at `AlienSettings.SPEED = 0.5`; with 3 hearts that's a generous window before the run ends. If it feels too long (run never ends in practice), bump SPEED first, then SPAWN_RATE down. If it feels too short (every miss compounds before you can read the next word), lower SPEED to 0.4.
 
 ### Stage 7 — Score + simple difficulty ramp
 **Goal:** Word kills award points. Score visible. Spawn rate (and maybe fall speed) increases as score climbs.
