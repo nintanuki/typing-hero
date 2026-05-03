@@ -194,18 +194,22 @@ Each stage is small enough to finish, run, and *see something change* in one sit
 
 **Capitalization rule lands here.** Q7 is now resolved: every string we render goes through `.upper()`. The Stage 2 work threads this through three places — `Alien.draw_word`, the typing-buffer blit in `main.py`, and the Enter-comparison (which uppercases both sides before checking equality). Future stages must keep that pattern.
 
-### Stage 3 — Multiple aliens with prefix-locking
+### Stage 3 — Multiple aliens with prefix-locking ✅
 **Goal:** Three aliens visible with different words. Typing the first letter of one of them locks onto it (visual highlight); typing the rest of the word + Enter destroys it.
 
 **Steps:**
 
-- [ ] 1. Spawn three hardcoded aliens at fixed positions with three different words (different first letters).
-- [ ] 2. Build a small `WordManager` (in `systems/word_manager.py`) that tracks `current_prefix` and `targeted_alien`. On each KEYDOWN: if no target locked, find the alien whose word starts with the new prefix; if a target is locked, append the letter only if the new prefix still matches the target's word.
-- [ ] 3. Visually highlight the targeted alien (e.g. tint its word color or draw a bracket around it). Render typed prefix in a different color than untyped letters in the targeted word.
-- [ ] 4. On Enter (or full match), if the prefix equals the target's word, kill it and clear the lock.
-- [ ] 5. Smoke test: pressing different first letters locks onto the matching alien; typing the wrong continuation does not advance.
+- [x] 1. Spawn three hardcoded aliens at fixed positions with three different words (different first letters).
+- [x] 2. Build a small `WordManager` (in `systems/word_manager.py`) that tracks `current_prefix` and `targeted_alien`. On each KEYDOWN: if no target locked, find the alien whose word starts with the new prefix; if a target is locked, append the letter only if the new prefix still matches the target's word.
+- [x] 3. Visually highlight the targeted alien (e.g. tint its word color or draw a bracket around it). Render typed prefix in a different color than untyped letters in the targeted word.
+- [x] 4. On Enter (or full match), if the prefix equals the target's word, kill it and clear the lock.
+- [x] 5. Smoke test: pressing different first letters locks onto the matching alien; typing the wrong continuation does not advance.
 
-**Open question to resolve:** what happens on a wrong character mid-word? (Q3.) For v1, recommend: ignore the keystroke, do not break the lock.
+**Resolution this stage:** Q3 is now resolved as **ignore wrong-letter keystrokes; the lock survives** — the most forgiving option, easy to relax to "break lock" later by deleting one branch in `WordManager.handle_letter`. Highlight style is the **two-color word** (typed prefix in `WordSettings.PREFIX_COLOR` cyan, untyped suffix in `WordSettings.COLOR` white) — a bracket/reticle around the alien sprite was considered but cut as redundant once the prefix split made the lock unmistakable. The three demo aliens (red `HELLO` left, green `WORLD` center, yellow `TYPE` right) live in `Stage3Layout` in `settings.py` so they're tunable in one place; that class will be deleted when `SpawnDirector` takes over alien creation in Stage 4.
+
+**Tie-break rule landed.** When two aliens share a starting letter (Stage 3 deliberately avoids it; Stage 4+ word-list spawning will produce it), `WordManager._acquire_target` picks the **lowest-y alien** — the one closest to the bottom edge, i.e. most about to be missed. This matches the `§6` pitfall note about ambiguous prefix-locking. Sort key is `rect.top` (descending); revisit if Stage 5 motion makes a `centery`-based key feel more natural.
+
+**Enter on a partial prefix** clears the lock + buffer without firing — same "Enter always commits" feel as Stage 2. Could become a no-op (silent ignore) later if it feels punishing in practice.
 
 ### Stage 4 — Word list + spawning over time
 **Goal:** Aliens spawn at the top of the screen at intervals, each picking a random word from `assets/words.txt`. They still don't move.

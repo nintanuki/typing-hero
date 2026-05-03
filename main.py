@@ -1,13 +1,16 @@
 """Typing Hero entry point.
 
-Stage 2 scaffold: opens the pygame window, runs the event loop, and
-renders a single static red alien at center-screen with the word
-"hello" floating above it. The player builds up a typing buffer with
-letter keys, sees it rendered at the bottom of the screen, and on
-``Enter`` the buffer is compared (case-insensitively) against the
-alien's word — a match destroys the alien and prints "kill" to the
-console; a mismatch just clears the buffer. Falling motion, miss
-counting, the laser visual, and audio all land in later stages.
+Stage 3 scaffold: the screen now hosts three static aliens at fixed
+positions in the upper third (red HELLO at left, green WORLD at center,
+yellow TYPE at right), each carrying its own word. A ``WordManager``
+owns the typing state — pressing the first letter of any word locks
+onto the matching alien (the typed prefix renders in cyan, the untyped
+suffix in white), further letters extend the lock only when they keep
+matching the locked word, wrong letters mid-word are ignored, Enter
+destroys the alien if the prefix matches its word, and Backspace
+shrinks the prefix (releasing the lock when the prefix empties). Falling
+motion, miss counting, the laser visual, audio, and the real word list
+all land in later stages.
 
 ESC and the OS close button still quit the window cleanly. All text
 that reaches the screen is rendered uppercase per the project-wide
@@ -19,7 +22,14 @@ import sys
 import pygame
 
 from core.sprites import Alien
-from settings import FontSettings, ScreenSettings, TypingSettings, WordSettings
+from settings import (
+    FontSettings,
+    ScreenSettings,
+    Stage3Layout,
+    TypingSettings,
+    WordSettings,
+)
+from systems.word_manager import WordManager
 
 
 def run() -> None:
@@ -29,12 +39,14 @@ def run() -> None:
     pygame.display.set_caption(ScreenSettings.TITLE)
     clock = pygame.time.Clock()
 
-    # Stage 1 staging: a single red alien parked at center-screen with
-    # a hardcoded word. The word list, spawn director, and per-alien
-    # color randomization arrive in Stage 4 — for now we just need
-    # something on screen to look at.
+    # Stage 3 staging: three aliens at fixed positions with deliberately
+    # different first letters (H, W, T) so prefix-locking is testable.
+    # Real spawning from a word list arrives in Stage 4 — until then,
+    # the (color, word, x) tuples come from settings.Stage3Layout so the
+    # demo positions are tunable in one place rather than buried here.
     aliens = pygame.sprite.Group()
-    aliens.add(Alien(color='red', pos=ScreenSettings.CENTER, word='hello'))
+    for color, word, x in Stage3Layout.ALIENS:
+        aliens.add(Alien(color=color, pos=(x, Stage3Layout.ROW_Y), word=word))
 
     # Fonts are loaded once and passed into render paths so we never
     # call pygame.font.Font(...) inside the per-frame loop. The word
@@ -43,12 +55,14 @@ def run() -> None:
     word_font = pygame.font.Font(FontSettings.FONT, WordSettings.SIZE)
     typing_font = pygame.font.Font(FontSettings.FONT, TypingSettings.SIZE)
 
-    # Stage 2: the typing buffer accumulates characters from KEYDOWN
-    # events. Stored verbatim (we render uppercase at draw time) and
-    # cleared on Enter regardless of whether the submission matched a
-    # word. Backspace removes the most recent character — small QoL
-    # call mentioned in TESTING.md Stage 2.
-    current_input = ""
+    # Stage 3: typing state moves into a WordManager that owns the
+    # locked target + the active prefix and decides whether each
+    # keystroke advances. main.py just routes events to it and reads
+    # back its state when rendering. The MAX_LENGTH guard from Stage 2
+    # is still enforced here at the call site — the manager itself
+    # doesn't care about buffer length, but the keyboard-repeat /
+    # paste defense lives at the input boundary.
+    word_manager = WordManager()
 
     running = True
     while running:
@@ -59,43 +73,48 @@ def run() -> None:
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 elif event.key == pygame.K_RETURN:
-                    # Enter submits the buffer. Stage 2 has only one
-                    # alien on screen, so the only matching candidate
-                    # is whichever alien (if any) carries the typed
-                    # word. Multi-alien prefix-locking arrives in
-                    # Stage 3 — until then this loop is effectively a
-                    # one-element scan. Comparison is case-insensitive
-                    # because in-game text is always uppercase but the
-                    # underlying word can be stored in any case.
-                    submission = current_input.upper()
-                    for alien in list(aliens):
-                        if submission == alien.word.upper():
-                            alien.kill()
-                            print("kill")
-                            break
-                    current_input = ""
+                    # Enter commits the buffer. The manager returns the
+                    # alien to remove if the prefix matched its word,
+                    # otherwise None — and clears its own state in
+                    # either case (mirroring Stage 2's "Enter always
+                    # resets the buffer" feel).
+                    killed = word_manager.handle_enter()
+                    if killed is not None:
+                        killed.kill()
+                        print("kill")
                 elif event.key == pygame.K_BACKSPACE:
-                    current_input = current_input[:-1]
+                    word_manager.handle_backspace()
                 elif event.unicode.isalpha():
-                    # Only accept letters into the buffer in v1 — no
-                    # punctuation, no digits (Q7 in docs/TODO.md).
-                    # MAX_LENGTH guards against keyboard repeat /
-                    # accidental paste growing the buffer unbounded.
-                    if len(current_input) < TypingSettings.MAX_LENGTH:
-                        current_input += event.unicode
+                    # Only accept letters in v1 — no punctuation, no
+                    # digits (Q7 in docs/TODO.md). The MAX_LENGTH guard
+                    # protects against keyboard repeat / paste growing
+                    # the rendered buffer surface unbounded; the
+                    # manager itself is silent on length so the cap
+                    # lives here at the input boundary.
+                    if word_manager.prefix_length < TypingSettings.MAX_LENGTH:
+                        word_manager.handle_letter(event.unicode, aliens)
 
         screen.fill(ScreenSettings.BG_COLOR)
         aliens.draw(screen)
         for alien in aliens:
-            alien.draw_word(screen, word_font)
+            # Only the targeted alien gets a non-zero prefix_length;
+            # every other alien renders its whole word in
+            # WordSettings.COLOR via the default-argument fast path in
+            # draw_word. Comparing by identity (``is``) rather than
+            # equality so two aliens that happen to share a word
+            # wouldn't both light up.
+            if alien is word_manager.targeted_alien:
+                alien.draw_word(screen, word_font, word_manager.prefix_length)
+            else:
+                alien.draw_word(screen, word_font)
 
         # Render the typing buffer at the bottom-center of the screen.
-        # Always uppercase per the project-wide capitalization rule;
-        # if the buffer is empty we skip the blit so we don't waste a
-        # render on an empty surface.
-        if current_input:
+        # Already uppercase coming out of the manager; if the buffer is
+        # empty we skip the blit so we don't waste a render on an
+        # empty surface.
+        if word_manager.current_prefix:
             buffer_surf = typing_font.render(
-                current_input.upper(), True, TypingSettings.COLOR
+                word_manager.current_prefix, True, TypingSettings.COLOR
             )
             buffer_rect = buffer_surf.get_rect(
                 midbottom=(

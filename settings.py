@@ -79,12 +79,55 @@ class WordSettings:
     # 4-6 letter words readable without crowding the sprite; revisit if
     # Stage 6+ tuning makes longer words common.
     SIZE = FontSettings.MEDIUM
+    # Color used for the untyped portion of an alien's word (i.e. the
+    # whole word when no target is locked, or the suffix that has not
+    # been typed yet on the targeted alien). Renamed concept arrives in
+    # Stage 3 alongside PREFIX_COLOR — the plain ``COLOR`` name is kept
+    # so Stage 1/2 call sites that pass no prefix still read naturally.
     COLOR = ColorSettings.COLORS['WHITE']
+    # Color used for the already-typed prefix on the targeted alien's
+    # word (Stage 3). Cyan reads as "active / electric" against the
+    # untyped white suffix and is distinguishable on the red/green/
+    # yellow/blue alien sprites without clashing with any of them.
+    PREFIX_COLOR = ColorSettings.COLORS['CYAN']
     # Pixel gap between the word's baseline and the alien sprite's top
     # edge. Big enough that the word never visually merges with the
     # sprite, small enough that it still reads as "this word belongs to
     # this alien" at typical spawn density.
     OFFSET_ABOVE_SPRITE = 12
+
+
+class Stage3Layout:
+    """Hardcoded positions and words for the three Stage 3 demo aliens.
+
+    Stage 3's job is to prove prefix-locking works — it does not yet
+    spawn from a word list (Stage 4) or move (Stage 5). So the three
+    aliens are placed at fixed points in the upper third of the screen
+    with three deliberately different first letters (H, W, T) so the
+    Stage 3 smoke test in ``docs/TESTING.md`` can exercise lock
+    acquisition by pressing different first letters. These constants
+    are scoped to Stage 3 and will be removed once ``SpawnDirector``
+    takes over alien creation in Stage 4.
+    """
+
+    # Vertical band where the three demo aliens sit. Upper third keeps
+    # them clear of the bottom-of-screen typing buffer and leaves room
+    # below for the falling animation Stage 5 will introduce.
+    ROW_Y = ScreenSettings.HEIGHT // 4
+    # Horizontal positions: 1/4, 1/2, 3/4 of screen width — even spread
+    # across the playfield so prefix-locking is unambiguous and the
+    # visual highlight has space to breathe.
+    LEFT_X = ScreenSettings.WIDTH // 4
+    CENTER_X = ScreenSettings.WIDTH // 2
+    RIGHT_X = (ScreenSettings.WIDTH * 3) // 4
+    # (color, word, x) tuples consumed by main.py to build the demo
+    # group. Words are stored lowercase on disk per Q7; the renderer
+    # uppercases at draw time.
+    ALIENS = (
+        ('red', 'hello', LEFT_X),
+        ('green', 'world', CENTER_X),
+        ('yellow', 'type', RIGHT_X),
+    )
 
 
 class TypingSettings:

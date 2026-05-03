@@ -50,7 +50,7 @@ class Alien(pygame.sprite.Sprite):
         self.image = pygame.image.load(sprite_path).convert_alpha()
         self.rect = self.image.get_rect(center=pos)
 
-    def draw_word(self, surface, font):
+    def draw_word(self, surface, font, prefix_length=0):
         """Render ``self.word`` horizontally centered above the sprite.
 
         The word's baseline sits ``WordSettings.OFFSET_ABOVE_SPRITE``
@@ -60,15 +60,65 @@ class Alien(pygame.sprite.Sprite):
         ``docs/TODO.md`` Q7) — storing ``self.word`` in any case is
         fine; what reaches the screen is always all caps.
 
+        Stage 3 introduces two-color rendering: when ``prefix_length``
+        is greater than zero, the first ``prefix_length`` letters are
+        rasterized in ``WordSettings.PREFIX_COLOR`` (the typed portion)
+        and the remainder in ``WordSettings.COLOR`` (the untyped
+        suffix). The two surfaces are blitted side by side so the
+        boundary between typed and untyped is exactly where the
+        player's progress sits. ``prefix_length=0`` falls through to a
+        single-color render — Stage 1/2 callers don't need to change.
+
         Args:
             surface (pygame.Surface): Destination surface, typically the
                 main game screen.
             font (pygame.font.Font): Pre-loaded font used to rasterize
                 the word. Caller owns the font so it can be reused
                 across many aliens without re-loading per frame.
+            prefix_length (int): Number of leading letters of
+                ``self.word`` that have already been typed. Defaults to
+                0 (whole word renders in ``WordSettings.COLOR``).
+                Clamped at the word's length so callers don't have to
+                guard against off-by-one when the player just completed
+                the word.
         """
-        word_surf = font.render(self.word.upper(), True, WordSettings.COLOR)
-        word_rect = word_surf.get_rect(
-            midbottom=(self.rect.centerx, self.rect.top - WordSettings.OFFSET_ABOVE_SPRITE)
+        full = self.word.upper()
+        # Clamp defensively — a caller could pass len(word) on the same
+        # frame they kill the alien; rather than raise, we render the
+        # whole word as "typed" and let the kill happen on the next
+        # frame. Negative values fall back to "no prefix" semantics.
+        prefix_length = max(0, min(prefix_length, len(full)))
+
+        if prefix_length == 0:
+            word_surf = font.render(full, True, WordSettings.COLOR)
+            word_rect = word_surf.get_rect(
+                midbottom=(self.rect.centerx, self.rect.top - WordSettings.OFFSET_ABOVE_SPRITE)
+            )
+            surface.blit(word_surf, word_rect)
+            return
+
+        # Two-color path: render the typed prefix and the untyped suffix
+        # on separate surfaces, then position them so the combined width
+        # is centered above the sprite. Centering the *combined* width
+        # (rather than each piece independently) keeps the word visually
+        # locked to the alien's centerline as letters get typed.
+        prefix_surf = font.render(
+            full[:prefix_length], True, WordSettings.PREFIX_COLOR
         )
-        surface.blit(word_surf, word_rect)
+        suffix_surf = font.render(
+            full[prefix_length:], True, WordSettings.COLOR
+        )
+        total_width = prefix_surf.get_width() + suffix_surf.get_width()
+        # Both surfaces share the same baseline (same font, same render
+        # mode), so we can align tops and let the font's internal metrics
+        # handle vertical placement. ``midbottom`` style positioning is
+        # done on the combined rect so the word sits at the same y as
+        # the single-color path.
+        baseline_y = self.rect.top - WordSettings.OFFSET_ABOVE_SPRITE
+        left_x = self.rect.centerx - total_width // 2
+        prefix_rect = prefix_surf.get_rect(bottomleft=(left_x, baseline_y))
+        suffix_rect = suffix_surf.get_rect(
+            bottomleft=(left_x + prefix_surf.get_width(), baseline_y)
+        )
+        surface.blit(prefix_surf, prefix_rect)
+        surface.blit(suffix_surf, suffix_rect)

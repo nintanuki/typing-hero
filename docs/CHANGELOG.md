@@ -434,3 +434,163 @@ Stage 2 of the build plan lands: the player can now type letters into a buffer r
  * **Linear scan over the alien group on Enter** — at Stage 2 there is exactly one alien, but the same code keeps working at Stage 3 once multiple aliens are on screen; only the prefix-lock targeting changes. Iterating `list(aliens)` rather than `aliens` so `alien.kill()` (which mutates the group) doesn't disturb the iteration.
  * **`if current_input` guard around the buffer blit** — saves a `font.render("")` and a blit on every empty-buffer frame, which is most of them between submissions.
 **Editor:** Claude Opus 4.7 via Cowork
+
+## 2026-05-03 10:20 UTC — Stage 3 (multiple aliens + prefix-locking)
+
+Stage 3 of the build plan lands: three static aliens are on screen at once, each carrying a different word, and the player can type-and-target. Pressing the first letter of any word locks onto the matching alien (typed prefix renders cyan, untyped suffix renders white); further letters extend the prefix only when they keep matching the locked word; wrong letters mid-word are silently ignored without breaking the lock; Enter on a full match destroys the alien; Backspace shrinks the prefix and releases the lock when the prefix empties. The Stage 2 inline `current_input` string is replaced by a new `WordManager` in `systems/word_manager.py` that owns the typing state, with main.py reduced to event routing + render. Three open design questions (Q3 wrong-letter behavior, highlight style, hardcoded alien set) resolved this stage.
+
+**File:** settings.py
+**Date and Time:** 2026-05-03 10:20 UTC
+**Lines (at time of edit):** 75-130 (`WordSettings` extended; new `Stage3Layout` class inserted)
+**Before:**
+    class WordSettings:
+        SIZE = FontSettings.MEDIUM
+        COLOR = ColorSettings.COLORS['WHITE']
+        OFFSET_ABOVE_SPRITE = 12
+
+    class TypingSettings:
+        ...
+**After:**
+    class WordSettings:
+        SIZE = FontSettings.MEDIUM
+        COLOR = ColorSettings.COLORS['WHITE']        # untyped-suffix color
+        PREFIX_COLOR = ColorSettings.COLORS['CYAN']  # typed-prefix color (Stage 3)
+        OFFSET_ABOVE_SPRITE = 12
+
+    class Stage3Layout:
+        """Hardcoded positions and words for the three Stage 3 demo aliens."""
+        ROW_Y = ScreenSettings.HEIGHT // 4
+        LEFT_X, CENTER_X, RIGHT_X = (1/4, 1/2, 3/4 of WIDTH)
+        ALIENS = (
+            ('red', 'hello', LEFT_X),
+            ('green', 'world', CENTER_X),
+            ('yellow', 'type', RIGHT_X),
+        )
+
+    class TypingSettings:
+        ...
+**Why:** Two pieces of Stage 3 tuning land here per the Refactoring Rule "no magic numbers." `PREFIX_COLOR` is the typed-prefix color used by `Alien.draw_word`'s new two-color path — cyan reads as "active / electric" against the untyped-white suffix and is distinguishable on red/green/yellow/blue alien sprites without clashing with any of them. `Stage3Layout` is a deliberately scoped class for the three demo aliens (positions + (color, word) tuples); making it its own class rather than scattering constants into `WordSettings` flags it as transient — Stage 4 introduces `SpawnDirector` and `assets/words.txt`, at which point this whole class gets deleted. Words stored lowercase on disk per Q7; the renderer uppercases at draw time. The three first letters (H, W, T) are deliberately distinct so prefix-locking is testable without invoking the tie-break path.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** core/sprites.py
+**Date and Time:** 2026-05-03 10:20 UTC
+**Lines (at time of edit):** 53-124 (`Alien.draw_word` rewritten to a two-color path)
+**Before:**
+    def draw_word(self, surface, font):
+        word_surf = font.render(self.word.upper(), True, WordSettings.COLOR)
+        word_rect = word_surf.get_rect(midbottom=(...))
+        surface.blit(word_surf, word_rect)
+**After:**
+    def draw_word(self, surface, font, prefix_length=0):
+        full = self.word.upper()
+        prefix_length = max(0, min(prefix_length, len(full)))
+        if prefix_length == 0:
+            [single-color render, identical to before]
+            return
+        # Two-color path: typed prefix in PREFIX_COLOR, suffix in COLOR.
+        prefix_surf = font.render(full[:prefix_length], True, WordSettings.PREFIX_COLOR)
+        suffix_surf = font.render(full[prefix_length:], True, WordSettings.COLOR)
+        # Center the *combined* width above the alien so the word stays
+        # locked to the alien's centerline as letters get typed.
+        total_width = prefix_surf.get_width() + suffix_surf.get_width()
+        left_x = self.rect.centerx - total_width // 2
+        baseline_y = self.rect.top - WordSettings.OFFSET_ABOVE_SPRITE
+        prefix_rect = prefix_surf.get_rect(bottomleft=(left_x, baseline_y))
+        suffix_rect = suffix_surf.get_rect(bottomleft=(left_x + prefix_surf.get_width(), baseline_y))
+        surface.blit(prefix_surf, prefix_rect)
+        surface.blit(suffix_surf, suffix_rect)
+**Why:** TODO Stage 3 step 3 — visually distinguish the targeted alien by rendering the typed prefix in a different color than the untyped suffix. `prefix_length` defaults to 0 so the Stage 1/2 single-color call sites continue to work without modification (only `main.py`'s targeted-alien branch passes a non-zero value). The combined-width centering matters because if each piece were centered independently, the boundary between prefix and suffix would slide as letters are typed; centering the whole combined surface above `self.rect.centerx` keeps the word locked to the alien. The defensive `max(0, min(...))` clamp lets a caller pass `len(word)` on the same frame they kill the alien without raising — we render the whole word as "typed" (all cyan) and let the kill happen on the next frame. Using two `font.render` calls per frame for the targeted alien only is fine at 60 FPS for a few aliens (TODO §6 pitfall about per-frame text rendering); cache surfaces on the Alien if Stage 7's higher spawn rate makes this hurt.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** systems/word_manager.py
+**Date and Time:** 2026-05-03 10:20 UTC
+**Lines (at time of edit):** 1-180 (new file)
+**Before:**
+    (file did not exist)
+**After:**
+    """Typing input + prefix-locking state machine."""
+
+    class WordManager:
+        def __init__(self):
+            self.current_prefix = ""
+            self.targeted_alien = None
+
+        def handle_letter(self, char, aliens):
+            # reject non-single-letter input
+            # if no target locked: try to acquire one whose word starts with char
+            # if target locked: append letter only if new prefix still matches
+
+        def handle_backspace(self):
+            # shrink prefix by one; release lock when prefix empties
+
+        def handle_enter(self):
+            # return target if prefix matches its word; clear state either way
+
+        def clear_lock(self):
+            # drop both prefix and target unconditionally
+
+        def _acquire_target(self, char_upper, aliens):
+            # lowest-y candidate wins on ties
+
+        @property
+        def prefix_length(self): ...
+**Why:** TODO Stage 3 step 2 + the resolution of Q3. The Stage 2 inline `current_input` string had no concept of "which alien am I typing at," so once multiple aliens share a screen we need a state machine that knows. Putting it in `systems/word_manager.py` rather than inlining in `main.py` keeps `main.py` to event routing + render and matches the legacy code's `systems/managers.py` discipline. The class is intentionally pygame-free: it takes an iterable of objects exposing `.word` and `.rect.top`, which makes it unit-testable from a script (and was, before the docs landed — see the test harness output in this session). Q3 is resolved as "ignore wrong-letter keystrokes; lock survives" — the most forgiving v1 behavior, easy to swap to "break lock" later by deleting one branch in `handle_letter`. `_acquire_target` sorts candidates by `rect.top` descending so the lowest alien on the screen wins on a shared-first-letter tie, matching the §6 pitfall. `current_prefix` is stored uppercase so the typing-buffer blit in `main.py` and the `draw_word` slicing both consume it without re-uppercasing per frame. `prefix_length` exists as a `@property` so the render side of `main.py` doesn't have to know the prefix is a string.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** main.py
+**Date and Time:** 2026-05-03 10:20 UTC
+**Lines (at time of edit):** 1-119 (rewritten)
+**Before:**
+    """Typing Hero entry point. Stage 2 scaffold..."""
+    [single Alien at CENTER, current_input string, KEYDOWN routes
+     to RETURN/BACKSPACE/isalpha branches, linear scan on Enter]
+**After:**
+    """Typing Hero entry point. Stage 3 scaffold..."""
+    [three Aliens from Stage3Layout.ALIENS at fixed positions,
+     WordManager replaces current_input,
+     KEYDOWN routes to wm.handle_letter / handle_backspace / handle_enter,
+     targeted alien gets draw_word(prefix_length=wm.prefix_length),
+     buffer blit reads wm.current_prefix.]
+**Why:** TODO Stage 3 steps 1, 4, and 5. Notes:
+ * **Three aliens via `Stage3Layout.ALIENS`** rather than three hardcoded `Alien(...)` calls — lets a future tuning pass change words/positions in one place without touching the loop.
+ * **`if alien is word_manager.targeted_alien` (identity, not equality)** — guards against a future case where two aliens share a word; only the actually-locked instance lights up.
+ * **`MAX_LENGTH` cap stays at the call site, not in the manager.** The manager is silent on length; the cap defends against keyboard-repeat / paste at the input boundary, which is where pygame events live. Reading `word_manager.prefix_length` for the cap (rather than tracking a separate counter) keeps the source of truth in one place.
+ * **Buffer guard `if word_manager.current_prefix`** — same Stage 2 micro-optimization, skips the empty-render path on every empty-buffer frame.
+ * **`event.unicode.isalpha()` filter retained** — the manager itself rejects non-letters too (defense in depth), but filtering at the event layer means we don't even allocate `char_upper` for modifier-only keypresses.
+ * **`killed.kill()` returns control immediately**; explosion + SFX wiring lands in Stage 8.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** docs/TODO.md
+**Date and Time:** 2026-05-03 10:20 UTC
+**Lines (at time of edit):** Stage 3 heading + 5 step boxes + replaced "Open question" paragraph
+**Before:**
+    ### Stage 3 — Multiple aliens with prefix-locking
+    [5 unchecked step boxes]
+    **Open question to resolve:** what happens on a wrong character
+    mid-word? (Q3.) For v1, recommend: ignore the keystroke...
+**After:**
+    ### Stage 3 — Multiple aliens with prefix-locking ✅
+    [5 checked step boxes]
+    **Resolution this stage:** Q3 resolved as "ignore wrong-letter
+    keystrokes; lock survives." Highlight style is two-color word.
+    Three demo aliens live in Stage3Layout (deleted in Stage 4).
+    **Tie-break rule landed.** Lowest-y alien wins on shared start.
+    **Enter on partial prefix** clears lock + buffer without firing.
+**Why:** Same convention as Stage 0/1/2 entries — flip checkboxes, add ✅ to heading, replace the "open question" paragraph with a "resolution / what we built" paragraph capturing the design choices made this stage. The tie-break rule and Enter-on-partial behavior get their own sub-paragraphs because they're decisions a future session would otherwise have to re-derive from reading the manager source.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** docs/TESTING.md
+**Date and Time:** 2026-05-03 10:20 UTC
+**Lines (at time of edit):** 29-36 (Stage 3 section)
+**Before:**
+    ## Stage 3 — Multiple aliens + prefix-locking (not yet built)
+    [6 generic bullets covering visibility, lock-on, two-color render,
+     wrong-letter ignore, completion+kill]
+**After:**
+    ## Stage 3 — Multiple aliens + prefix-locking ✅
+    [9 specific bullets — three aliens with concrete words/colors/
+     positions, two-color render in cyan/white, wrong-letter ignore
+     including no-match-at-all case, Enter on partial clears,
+     Backspace shrinks-and-releases, the bottom typing buffer mirror.]
+**Why:** Same pattern as TODO — flip "(not yet built)" to ✅ and harden hedged checks into definite ones now that the behavior is locked. Three new bullets that didn't exist in the pre-stage version: the buffer-mirror check (regression hook for the Stage 2 → Stage 3 rewrite), the no-match-at-all silent-ignore check (Q3 corner case the pre-stage version missed), and the Enter-on-partial clears check (so the chosen Enter behavior is verifiable from this file alone).
+**Editor:** Claude Opus 4.7 via Cowork

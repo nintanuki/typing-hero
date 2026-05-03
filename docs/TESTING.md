@@ -26,14 +26,17 @@ Run the relevant section after every change. Each stage in [`TODO.md`](TODO.md) 
 * `Backspace` deletes the most recent character
 * All on-screen text renders in UPPERCASE (project-wide rule, see TODO Q7) — alien word, typing buffer, and any future HUD strings must all be uppercase before they hit `font.render`
 
-## Stage 3 — Multiple aliens + prefix-locking (not yet built)
+## Stage 3 — Multiple aliens + prefix-locking ✅
 
 * All previous checks still pass
-* Three aliens visible with three different words (different first letters)
-* Pressing the first letter of any word visually locks onto that alien
-* Typed prefix renders in a different color than the untyped suffix on the targeted word
-* While locked, pressing a letter that does not extend the locked word is ignored (no lock loss)
-* Completing the locked word (+ `Enter` if Enter required) destroys the alien and clears the lock
+* Three aliens visible with three different words and different first letters (`HELLO` / `WORLD` / `TYPE`, red / green / yellow, evenly spread across the upper third)
+* Pressing the first letter of any word locks onto that alien — the typed letter shows in cyan above the alien, untyped letters stay white
+* The bottom-of-screen typing buffer mirrors the typed prefix in real time
+* While locked, pressing a letter that does not extend the locked word is ignored — the lock survives, the buffer does not advance, no penalty (Q3 v1 default)
+* Letters that match no on-screen alien when no lock is active are silently ignored (no buffer growth, no lock acquired)
+* Completing the locked word and pressing `Enter` destroys the alien, clears the lock, and prints `kill` to the console
+* Pressing `Enter` on an empty or partial buffer clears the lock + buffer without firing (matches Stage 2's "Enter always commits" feel)
+* `Backspace` shrinks the typed prefix by one letter; emptying the buffer releases the lock
 
 ## Stage 4 — Word list + spawning (not yet built)
 
