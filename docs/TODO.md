@@ -331,3 +331,9 @@ Each stage is small enough to finish, run, and *see something change* in one sit
 - Combine `.gitignore` files (root + `legacy/`) — one of the original TODOs.
 - Decide whether `legacy/` should be in `.gitignore` or committed. Probably committed for now (so future-me can read it on a fresh clone), then deleted entirely once we're done.
 - Once Stage 0 lands, delete `legacy/__pycache__/` directories from disk (they're already gitignored but they're noise on local greps).
+
+## Notes
+- [ ] Try to be faithful to how the original game felt, same sound effects, visual effects, scoreboard, etc.
+- [ ] Aliens should move in patters just like the original game (yellow zig zag, blue the fastest, etc)
+- [ ] Instead of the player ship moving "teleporting" around the bottom of the screen and shooting aliens (I don't really see how else we'd depict it, any animation will be a delay between when the player presses enter, the ship moves, shoots and the alien dies) perhaps we can just have layers appear from the bottom of the screen. But then how do we handle the aliens that move? Maybe lasers can home in on them? No matter what there will still be a slight "delay" but for visual effect that is okay, that just means the player doesn't have until the alient ouches the bottom, just when they get too far for the laser to reach (there might be a point of no return) brainstorm this more.
+- [ ] Words might be too big? When the words get longer shrink them? What about when there are multiple aliens on the screen? Maybe the slow ones that move straight down should have "lanes?" so the words stay readable?

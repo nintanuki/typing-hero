@@ -37,12 +37,14 @@ from settings import (
 from systems.spawn_director import SpawnDirector
 from systems.word_manager import WordManager
 from ui.hud import GameOverScreen, HeartsHUD
+from ui.crt import CRT
 
 
 def run() -> None:
     """Initialize pygame and run the main loop until the user quits."""
     pygame.init()
     screen = pygame.display.set_mode(ScreenSettings.RESOLUTION)
+    crt = CRT(screen)
     pygame.display.set_caption(ScreenSettings.TITLE)
     clock = pygame.time.Clock()
 
@@ -244,6 +246,7 @@ def run() -> None:
             # finished," which is more informative than a black screen.
             game_over_screen.draw(screen)
 
+        crt.draw()
         pygame.display.flip()
         clock.tick(ScreenSettings.FPS)
 

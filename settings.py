@@ -30,11 +30,16 @@ class ScreenSettings:
     HEIGHT = 800
     RESOLUTION = (WIDTH, HEIGHT)
     CENTER = (WIDTH / 2, HEIGHT / 2)
-    FPS = 120
+    FPS = 120 # Do we want to keep it at 120? Or should we drop to 60?
     # Stage 0 fills the screen with a solid black each frame; once the
     # scrolling background ports over (Stage 8 polish), this constant becomes
     # a fallback that is never actually visible.
     BG_COLOR = ColorSettings.COLORS['BLACK']
+    CRT_ALPHA_RANGE = (75, 90)
+    CRT_SCANLINE_HEIGHT = 3 # vertical pixels between scanlines drawn on the CRT overlay
+    DEFAULT_BG_SCROLL_SPEED = 50
+    BG_SCROLL_STEP = 25 # how many pixels the background moves each difficulty step (lower = smoother, higher = more noticeable)
+    BG_SCROLL_MAX = 500 # maximum scroll speed for the background, to prevent it from becoming too fast at high scores
     TITLE = "Typing Hero"
 
 
