@@ -1,16 +1,15 @@
 """Typing Hero entry point.
 
-Stage 3 scaffold: the screen now hosts three static aliens at fixed
-positions in the upper third (red HELLO at left, green WORLD at center,
-yellow TYPE at right), each carrying its own word. A ``WordManager``
-owns the typing state — pressing the first letter of any word locks
-onto the matching alien (the typed prefix renders in cyan, the untyped
-suffix in white), further letters extend the lock only when they keep
-matching the locked word, wrong letters mid-word are ignored, Enter
-destroys the alien if the prefix matches its word, and Backspace
-shrinks the prefix (releasing the lock when the prefix empties). Falling
-motion, miss counting, the laser visual, audio, and the real word list
-all land in later stages.
+Stage 4 scaffold: the three hand-placed Stage 3 demo aliens are gone.
+A ``SpawnDirector`` now owns a pygame timer event that ticks every
+``SpawnSettings.SPAWN_RATE`` ms and pushes a fresh alien onto the
+screen at a random x near the top, carrying a random word from
+``assets/words.txt`` that no on-screen alien is currently using. The
+typing state machine from Stage 3 (``WordManager``: prefix-lock onto
+the first matching alien on the lowest-y tie-break, two-color word
+render, Enter to commit, Backspace to shrink) still drives the kill
+loop. Falling motion, miss counting, the laser visual, audio, and
+hearts all land in later stages.
 
 ESC and the OS close button still quit the window cleanly. All text
 that reaches the screen is rendered uppercase per the project-wide
@@ -21,14 +20,13 @@ import sys
 
 import pygame
 
-from core.sprites import Alien
 from settings import (
     FontSettings,
     ScreenSettings,
-    Stage3Layout,
     TypingSettings,
     WordSettings,
 )
+from systems.spawn_director import SpawnDirector
 from systems.word_manager import WordManager
 
 
@@ -39,14 +37,13 @@ def run() -> None:
     pygame.display.set_caption(ScreenSettings.TITLE)
     clock = pygame.time.Clock()
 
-    # Stage 3 staging: three aliens at fixed positions with deliberately
-    # different first letters (H, W, T) so prefix-locking is testable.
-    # Real spawning from a word list arrives in Stage 4 — until then,
-    # the (color, word, x) tuples come from settings.Stage3Layout so the
-    # demo positions are tunable in one place rather than buried here.
+    # Stage 4: aliens are no longer hand-placed — ``SpawnDirector``
+    # creates one each timer tick. The group starts empty; we kick off
+    # one immediate spawn after construction so the screen isn't blank
+    # for the first SPAWN_RATE ms after boot, and so the Stage 4 smoke
+    # test ("aliens appear at the top every couple seconds") sees an
+    # alien within the first frame instead of after the first interval.
     aliens = pygame.sprite.Group()
-    for color, word, x in Stage3Layout.ALIENS:
-        aliens.add(Alien(color=color, pos=(x, Stage3Layout.ROW_Y), word=word))
 
     # Fonts are loaded once and passed into render paths so we never
     # call pygame.font.Font(...) inside the per-frame loop. The word
@@ -62,13 +59,26 @@ def run() -> None:
     # is still enforced here at the call site — the manager itself
     # doesn't care about buffer length, but the keyboard-repeat /
     # paste defense lives at the input boundary.
-    word_manager = WordManager()
+    # Stage 4: the same manager also owns the loaded word pool (from
+    # ``WordSettings.WORDLIST_PATH``) and serves the next word to the
+    # spawner via ``pick_word``.
+    word_manager = WordManager(WordSettings.WORDLIST_PATH)
+    spawn_director = SpawnDirector()
+    # First-frame spawn so the player sees something immediately rather
+    # than waiting out the full timer interval at boot.
+    spawn_director.spawn(aliens, word_manager)
 
     running = True
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == spawn_director.spawn_event:
+                # Timer tick: one new alien with a fresh word. The
+                # director silently no-ops if the word pool is fully
+                # in-use, so this branch is safe to hit every tick
+                # regardless of how many aliens are already on screen.
+                spawn_director.spawn(aliens, word_manager)
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False

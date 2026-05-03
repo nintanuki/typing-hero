@@ -38,13 +38,16 @@ Run the relevant section after every change. Each stage in [`TODO.md`](TODO.md) 
 * Pressing `Enter` on an empty or partial buffer clears the lock + buffer without firing (matches Stage 2's "Enter always commits" feel)
 * `Backspace` shrinks the typed prefix by one letter; emptying the buffer releases the lock
 
-## Stage 4 — Word list + spawning (not yet built)
+## Stage 4 — Word list + spawning ✅
 
 * All previous checks still pass
-* Aliens spawn at the top of the screen at the configured interval
-* Each alien gets a word from `assets/words.txt`
-* No two on-screen aliens carry the same word at the same time
-* Aliens spawn at varied x positions (not all stacked at one column)
+* One alien is on screen within the first frame after launch (initial spawn) so the player isn't staring at black until the first timer tick
+* Subsequent aliens spawn at the top at the `SpawnSettings.SPAWN_RATE` interval (default 3000 ms — visibly "every couple seconds")
+* Each alien gets a random word from `assets/words.txt` (lowercased on disk, rendered uppercase per Q7)
+* No two on-screen aliens carry the same word at the same time — verifiable by watching a few spawn cycles and confirming every visible word is unique
+* Aliens spawn at varied x positions across the playfield (not all stacked at one column); the X_MARGIN keeps the longest words from clipping the screen edge
+* Two aliens whose words happen to start with the same letter still resolve correctly: pressing that letter locks onto the lower one (lowest-y tie-break from Stage 3)
+* If every word in the list happens to be on screen at once, the next spawn tick is a silent no-op rather than a crash or duplicate
 
 ## Stage 5 — Falling + miss (not yet built)
 

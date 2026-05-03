@@ -95,39 +95,54 @@ class WordSettings:
     # sprite, small enough that it still reads as "this word belongs to
     # this alien" at typical spawn density.
     OFFSET_ABOVE_SPRITE = 12
+    # Path to the on-disk word list ``WordManager`` loads at boot
+    # (Stage 4). Stored lowercase per Q7 — the renderer and the
+    # comparator both uppercase at use. Kept under ``assets/`` so
+    # editing the word list doesn't require touching code, and so the
+    # "everything bundled" layout from ``docs/TODO.md`` Stage 0 holds.
+    WORDLIST_PATH = os.path.join(
+        os.path.dirname(__file__), 'assets', 'words.txt'
+    )
 
 
-class Stage3Layout:
-    """Hardcoded positions and words for the three Stage 3 demo aliens.
+class SpawnSettings:
+    """Tunables for the Stage 4 alien spawner.
 
-    Stage 3's job is to prove prefix-locking works — it does not yet
-    spawn from a word list (Stage 4) or move (Stage 5). So the three
-    aliens are placed at fixed points in the upper third of the screen
-    with three deliberately different first letters (H, W, T) so the
-    Stage 3 smoke test in ``docs/TESTING.md`` can exercise lock
-    acquisition by pressing different first letters. These constants
-    are scoped to Stage 3 and will be removed once ``SpawnDirector``
-    takes over alien creation in Stage 4.
+    ``SpawnDirector`` reads these to drive the single pygame timer
+    event that pushes new aliens onto the screen. Difficulty scaling
+    (shrinking ``SPAWN_RATE`` as score climbs) is a Stage 7 concern;
+    Stage 4 keeps the rate constant.
     """
 
-    # Vertical band where the three demo aliens sit. Upper third keeps
-    # them clear of the bottom-of-screen typing buffer and leaves room
-    # below for the falling animation Stage 5 will introduce.
-    ROW_Y = ScreenSettings.HEIGHT // 4
-    # Horizontal positions: 1/4, 1/2, 3/4 of screen width — even spread
-    # across the playfield so prefix-locking is unambiguous and the
-    # visual highlight has space to breathe.
-    LEFT_X = ScreenSettings.WIDTH // 4
-    CENTER_X = ScreenSettings.WIDTH // 2
-    RIGHT_X = (ScreenSettings.WIDTH * 3) // 4
-    # (color, word, x) tuples consumed by main.py to build the demo
-    # group. Words are stored lowercase on disk per Q7; the renderer
-    # uppercases at draw time.
-    ALIENS = (
-        ('red', 'hello', LEFT_X),
-        ('green', 'world', CENTER_X),
-        ('yellow', 'type', RIGHT_X),
-    )
+    # Milliseconds between alien spawns. Star Hero's legacy default of
+    # 600 ms is brutal for a typing game (``docs/TODO.md`` §6 pitfall
+    # "The legacy alien spawn rate is way too fast for typing");
+    # 3000 ms gives the player real time to read the next word and
+    # commit to a target before the screen fills. Tune downward in
+    # Stage 5 once aliens fall and a "miss" actually costs something.
+    SPAWN_RATE = 3000
+    # Vertical center y of newly-spawned aliens. Stage 4 aliens don't
+    # move (Stage 5 ports falling), so the spawn y has to leave the
+    # alien sprite *and* the word floating above it both fully on
+    # screen. With WordSettings.OFFSET_ABOVE_SPRITE=12 and a MEDIUM
+    # font, y=80 keeps the word baseline around y=52 — clear of the
+    # screen top with a small breathing margin. Once Stage 5 lands,
+    # this becomes a negative y so aliens fall *into* the screen.
+    SPAWN_Y = 80
+    # Horizontal margin from each screen edge so the word floating
+    # above an alien doesn't clip the screen when the sprite spawns
+    # near a wall. Sized for the longest words in ``assets/words.txt``
+    # (e.g. "thunder", "crystal") rendered at WordSettings.SIZE — a
+    # ~140 px word centered on x needs ~70 px of breathing room each
+    # side; 80 keeps a small buffer. Revisit if longer words land in
+    # Stage 6+ tuning.
+    X_MARGIN = 80
+    # Alien colors the spawner picks from. Stage 4 picks uniformly —
+    # color-keyed difficulty bands and per-color point values are a
+    # Stage 7+ concern (``docs/TODO.md`` Q6). All four sprite colors
+    # exist in ``assets/graphics/`` already so any of them is fair
+    # game from the spawner's perspective.
+    COLORS = ('red', 'green', 'yellow', 'blue')
 
 
 class TypingSettings:

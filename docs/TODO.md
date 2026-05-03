@@ -211,15 +211,21 @@ Each stage is small enough to finish, run, and *see something change* in one sit
 
 **Enter on a partial prefix** clears the lock + buffer without firing — same "Enter always commits" feel as Stage 2. Could become a no-op (silent ignore) later if it feels punishing in practice.
 
-### Stage 4 — Word list + spawning over time
+### Stage 4 — Word list + spawning over time ✅
 **Goal:** Aliens spawn at the top of the screen at intervals, each picking a random word from `assets/words.txt`. They still don't move.
 
 **Steps:**
 
-- [ ] 1. Add `assets/words.txt` with 50–100 short common words.
-- [ ] 2. `WordManager` loads the file at boot and serves random words on demand. Ensure no duplicate words on screen at once (otherwise prefix-locking is ambiguous).
-- [ ] 3. Port a stripped `SpawnDirector` from `legacy/systems/managers.py` that fires a pygame timer event every N ms and spawns one alien at a random x position near the top.
-- [ ] 4. Smoke test: aliens appear at the top every couple seconds, with unique words. Typing still works against any of them.
+- [x] 1. Add `assets/words.txt` with 50–100 short common words.
+- [x] 2. `WordManager` loads the file at boot and serves random words on demand. Ensure no duplicate words on screen at once (otherwise prefix-locking is ambiguous).
+- [x] 3. Port a stripped `SpawnDirector` from `legacy/systems/managers.py` that fires a pygame timer event every N ms and spawns one alien at a random x position near the top.
+- [x] 4. Smoke test: aliens appear at the top every couple seconds, with unique words. Typing still works against any of them.
+
+**Resolution this stage:** the word pool lives on `WordManager` (rather than a separate `WordPool` class) — the manager already owns prefix state and the pool is the same shape of "give me the next word for the typing flow," so co-locating them keeps the systems folder lighter. `WordManager.pick_word(in_use)` is the single read path; the `in_use` set is built by the caller as `{a.word for a in aliens}` so the manager never has to know about pygame sprite groups. Duplicate-word avoidance is per-spawn-tick (filter the pool against the on-screen set) rather than a stateful "checkout/checkin" — simpler and means a killed alien's word is automatically eligible to spawn again on the next tick. **`SpawnDirector` is a 70-line port** vs the legacy 145-line version — alien-fired lasers, drop-table rolls, and `adjust_difficulty` all stayed in legacy (lasers + drops are forever-cut per §2; difficulty scaling lives in Stage 7). The director takes no `game` reference: each `spawn(aliens, word_manager)` call gets its dependencies passed in, which keeps it trivial to construct in tests.
+
+**Tunables landed:** `WordSettings.WORDLIST_PATH`, plus a new `SpawnSettings` carrying `SPAWN_RATE = 3000` ms (per §6 pitfall: "legacy 600 ms is way too fast for typing"), `SPAWN_Y = 80` (visible top band — Stage 5 will move this above the screen once aliens fall), `X_MARGIN = 80` (keeps the longest words from clipping), and `COLORS = ('red', 'green', 'yellow', 'blue')` picked uniformly. Color-keyed difficulty bands (Q6) deferred to Stage 7+.
+
+**`Stage3Layout` deleted** as planned in the Stage 3 entry. **First-frame spawn** is called once after `SpawnDirector()` so the screen isn't blank for the first 3000 ms after boot — the timer still drives every subsequent spawn. **Pool exhaustion is a silent no-op** in `pick_word` (returns `None`) rather than a crash; the director skips that tick and the next on-screen completion frees a word naturally.
 
 ### Stage 5 — Aliens fall + miss mechanic
 **Goal:** Aliens drift downward. Reaching the bottom edge counts as a miss (just print "miss" for now).

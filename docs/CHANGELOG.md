@@ -594,3 +594,226 @@ Stage 3 of the build plan lands: three static aliens are on screen at once, each
      Backspace shrinks-and-releases, the bottom typing buffer mirror.]
 **Why:** Same pattern as TODO — flip "(not yet built)" to ✅ and harden hedged checks into definite ones now that the behavior is locked. Three new bullets that didn't exist in the pre-stage version: the buffer-mirror check (regression hook for the Stage 2 → Stage 3 rewrite), the no-match-at-all silent-ignore check (Q3 corner case the pre-stage version missed), and the Enter-on-partial clears check (so the chosen Enter behavior is verifiable from this file alone).
 **Editor:** Claude Opus 4.7 via Cowork
+
+## 2026-05-03 10:42 UTC — Stage 4 (word list + timed spawning)
+
+Stage 4 of the build plan lands: aliens are no longer hand-placed. A `SpawnDirector` owns one pygame custom timer event that ticks every `SpawnSettings.SPAWN_RATE` ms and pushes a fresh alien onto the screen at a random x near the top, carrying a random word from `assets/words.txt` that no on-screen alien is currently using. The Stage 3 typing state machine is unchanged — `WordManager` still owns the prefix-lock, two-color word render, lowest-y tie-break, and Enter/Backspace handling — but the same class also now owns the word pool and exposes `pick_word(in_use)` for the spawner. `Stage3Layout` is deleted as planned. Aliens still don't move (Stage 5).
+
+**File:** assets/words.txt
+**Date and Time:** 2026-05-03 10:42 UTC
+**Lines (at time of edit):** 1-76 (new file)
+**Before:**
+    (file did not exist)
+**After:**
+    apple
+    arrow
+    beach
+    bird
+    brave
+    [...71 more, one short common word per line, lowercase, 3–7 letters
+     each: brick, candy, cloud, crown, crystal, dance, dragon, dream,
+     earth, echo, falcon, fire, flame, flower, forest, ghost, glass,
+     golden, guitar, hammer, happy, heart, honey, ice, island, jelly,
+     jewel, jungle, karma, king, laser, light, magic, melody, mirror,
+     moon, mountain, night, ocean, piano, planet, quartz, queen,
+     rabbit, rainbow, river, robot, rocket, silver, smile, snow, spark,
+     star, stone, storm, sugar, sword, thunder, tiger, tower, turtle,
+     violet, volcano, water, whale, wind, winter, wizard, wolf, yellow,
+     zebra]
+**Why:** TODO Stage 4 step 1 calls for "50–100 short common words" — landed at 76, comfortably mid-range. Words stored lowercase per Q7 (uppercase at render and compare time). The mix is biased toward 4–7 letter words because Stage 5+ tuning will likely want a longer-words-as-difficulty knob; very short 3-letter words could be added later for an "easy" tier per Q6. Diverse first letters across the alphabet (every starting letter from A through Z is represented at least once except a few rare ones) so a player learning the prefix-lock system in Stage 4 sees variety, but duplicate first letters are deliberately *not* avoided — Stage 3 already handles the tie-break and Stage 4's whole point is exercising that path.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** settings.py
+**Date and Time:** 2026-05-03 10:42 UTC
+**Lines (at time of edit):** WordSettings extended (added WORDLIST_PATH); new SpawnSettings class inserted; Stage3Layout removed
+**Before:**
+    class WordSettings:
+        SIZE = FontSettings.MEDIUM
+        COLOR = ColorSettings.COLORS['WHITE']
+        PREFIX_COLOR = ColorSettings.COLORS['CYAN']
+        OFFSET_ABOVE_SPRITE = 12
+
+    class Stage3Layout:
+        """Hardcoded positions and words for the three Stage 3 demo aliens."""
+        ROW_Y = ScreenSettings.HEIGHT // 4
+        LEFT_X, CENTER_X, RIGHT_X = (1/4, 1/2, 3/4 of WIDTH)
+        ALIENS = (
+            ('red', 'hello', LEFT_X),
+            ('green', 'world', CENTER_X),
+            ('yellow', 'type', RIGHT_X),
+        )
+
+    class TypingSettings:
+        ...
+**After:**
+    class WordSettings:
+        ...
+        OFFSET_ABOVE_SPRITE = 12
+        WORDLIST_PATH = os.path.join(
+            os.path.dirname(__file__), 'assets', 'words.txt'
+        )
+
+    class SpawnSettings:
+        """Tunables for the Stage 4 alien spawner."""
+        SPAWN_RATE = 3000
+        SPAWN_Y = 80
+        X_MARGIN = 80
+        COLORS = ('red', 'green', 'yellow', 'blue')
+
+    class TypingSettings:
+        ...
+**Why:** Three things at once. `WORDLIST_PATH` lives on `WordSettings` because the path is conceptually about word rendering's data source, and putting it next to `SIZE` / `COLOR` keeps "everything about words" in one block. `SpawnSettings` is a new class because spawn timing/position/color choices are a distinct concern from how words look, and Stage 7's difficulty scaling will grow this class (MIN_SPAWN_RATE, DIFFICULTY_STEP, etc.) — better to start the namespace fresh than overload `WordSettings`. `SPAWN_RATE = 3000` ms directly answers the §6 pitfall "legacy 600 ms is way too fast for typing"; `SPAWN_Y = 80` puts the alien's center at y=80 so the word floating 12 px above its top edge clears y=32 on a MEDIUM font (visible with breathing room) — Stage 5's port of the falling motion will replace this with a negative y so aliens fall *into* the screen. `X_MARGIN = 80` is sized for the longest words in the list (`thunder`, `crystal`, `volcano` at MEDIUM render to ~140 px, so centered placement needs ~70 px of breathing room each side). `COLORS` picks uniformly — Q6's color-keyed difficulty bands deferred to Stage 7+. **`Stage3Layout` removed** per the promise made in its Stage 3 docstring ("These constants are scoped to Stage 3 and will be removed once `SpawnDirector` takes over alien creation in Stage 4"); the spawner now owns alien creation, so the demo positions have no caller.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** systems/word_manager.py
+**Date and Time:** 2026-05-03 10:42 UTC
+**Lines (at time of edit):** Module docstring extended; `__init__` gains optional `wordlist_path`; new `pick_word` and `_load_words` methods inserted before `_acquire_target`
+**Before:**
+    """Typing input + prefix-locking state machine."""
+
+    class WordManager:
+        def __init__(self):
+            self.current_prefix = ""
+            self.targeted_alien = None
+
+        def handle_letter(...): ...
+        def handle_backspace(...): ...
+        def handle_enter(...): ...
+        def clear_lock(...): ...
+        def _acquire_target(...): ...
+        @property
+        def prefix_length(...): ...
+**After:**
+    """Typing input + prefix-locking state machine + word pool."""
+    import random
+
+    class WordManager:
+        def __init__(self, wordlist_path=None):
+            self.current_prefix = ""
+            self.targeted_alien = None
+            self._words = self._load_words(wordlist_path) if wordlist_path else []
+
+        # [handle_letter, handle_backspace, handle_enter, clear_lock unchanged]
+
+        def pick_word(self, in_use):
+            in_use_set = set(in_use)
+            available = [w for w in self._words if w not in in_use_set]
+            if not available:
+                return None
+            return random.choice(available)
+
+        @staticmethod
+        def _load_words(path):
+            words = []
+            with open(path, 'r', encoding='utf-8') as source:
+                for line in source:
+                    stripped = line.strip().lower()
+                    if stripped.isalpha():
+                        words.append(stripped)
+            return words
+
+        # [_acquire_target unchanged; prefix_length @property unchanged]
+**Why:** TODO Stage 4 step 2. Putting the pool on `WordManager` rather than a separate `WordPool` class avoids creating a one-method module — the manager already owns the typing-flow data, the pool is the same kind of data ("the next word for the typing flow"), and co-locating them keeps `systems/` lean. `wordlist_path` is optional so Stage 1–3 unit tests that exercise prefix-locking only can still construct an empty manager without touching disk. `pick_word` filters by *current on-screen words* rather than maintaining a stateful "checked-out" set: when an alien is killed, its word is automatically re-eligible on the next spawn tick, with no `release_word` call needed at the kill site — a smaller API surface and one less place a bug can live. `pick_word` returns `None` (rather than raising) when the pool is exhausted; the director treats `None` as "skip this tick," which is the right behavior for the "every loaded word is on screen" edge case (forcing a duplicate or crashing would both be worse). `_load_words` is `@staticmethod` because it doesn't touch instance state and is testable in isolation; it silently drops non-alpha lines (blank lines, punctuated entries, digits) so a hand-edited `words.txt` with a stray comment or empty line at the bottom doesn't bring down boot — only `str.isalpha`-passing lines enter the pool. Module-level `import random` is added (vs the legacy convention of importing where used) because `pick_word` is the only consumer and a single import at the top reads cleaner than scattered `import random` inside methods.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** systems/spawn_director.py
+**Date and Time:** 2026-05-03 10:42 UTC
+**Lines (at time of edit):** 1-88 (new file)
+**Before:**
+    (file did not exist)
+**After:**
+    """Alien spawning driver."""
+    import random
+    import pygame
+    from core.sprites import Alien
+    from settings import ScreenSettings, SpawnSettings
+
+    class SpawnDirector:
+        def __init__(self):
+            self.spawn_event = pygame.event.custom_type()
+            pygame.time.set_timer(self.spawn_event, SpawnSettings.SPAWN_RATE)
+
+        def spawn(self, aliens, word_manager):
+            in_use = {alien.word for alien in aliens}
+            word = word_manager.pick_word(in_use)
+            if word is None:
+                return  # pool exhausted; skip this tick
+            color = random.choice(SpawnSettings.COLORS)
+            x = random.randint(
+                SpawnSettings.X_MARGIN,
+                ScreenSettings.WIDTH - SpawnSettings.X_MARGIN,
+            )
+            aliens.add(Alien(color=color, pos=(x, SpawnSettings.SPAWN_Y), word=word))
+**Why:** TODO Stage 4 step 3 — "stripped" port of the legacy `SpawnDirector` from `legacy/systems/managers.py` (which was 145 lines and also handled alien-fired lasers, drop-table rolls, and `adjust_difficulty`). Typing Hero's spawner is 88 lines (mostly docstring + comments) because:
+ * **Alien-fired lasers are forever-cut** per §2 ("Aliens threaten by reaching the bottom, not by shooting") — no `alien_laser_timer`, no `alien_shoot`.
+ * **Drop tables are gone for v1** (Q8: "Cut all powerups for v1; add 1–2 in a later stage") — no `try_spawn_alien_drop`.
+ * **Difficulty scaling lives in Stage 7** — no `adjust_difficulty`.
+ * **No `game` reference** — the legacy version stored a back-reference to `GameManager` and reached into `game.aliens`, `game.audio`, `game.scores`. The new `spawn(aliens, word_manager)` takes its dependencies as parameters, which keeps it constructable in tests with no game context and matches the Refactoring Rule "communicate through GameManager" (Stage 9 will likely add a thin GameManager that owns both the sprite group and the manager and just calls `spawn_director.spawn(...)` from the event handler — at which point the parameter list is unchanged, only the call site moves).
+The in-use set is built at the call site (`{alien.word for alien in aliens}`) so `WordManager` doesn't have to know about pygame sprite groups — keeps the manager unit-testable. `random.randint` is inclusive on both ends; the `X_MARGIN` keeps the rendered word from clipping the screen edge even on the longest words in the list. `pygame.event.custom_type()` reserves a fresh event id (vs hardcoding `USEREVENT + N`, which is the legacy pattern and prone to ID collisions when more timers land); the event id is exposed as `self.spawn_event` so the main loop can match against it without importing it.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** main.py
+**Date and Time:** 2026-05-03 10:42 UTC
+**Lines (at time of edit):** 1-145 (rewritten)
+**Before:**
+    """Typing Hero entry point. Stage 3 scaffold..."""
+    [imports include Alien + Stage3Layout; three aliens built from
+     Stage3Layout.ALIENS; WordManager() constructed empty;
+     event loop handles QUIT/ESC/RETURN/BACKSPACE/letter only.]
+**After:**
+    """Typing Hero entry point. Stage 4 scaffold..."""
+    [Alien + Stage3Layout imports dropped; SpawnDirector imported;
+     aliens = pygame.sprite.Group() (empty);
+     word_manager = WordManager(WordSettings.WORDLIST_PATH);
+     spawn_director = SpawnDirector();
+     spawn_director.spawn(aliens, word_manager)  # first-frame spawn;
+     event loop adds elif event.type == spawn_director.spawn_event:
+         spawn_director.spawn(aliens, word_manager)]
+**Why:** TODO Stage 4 steps 3 + 4 (wiring + smoke test). Notes:
+ * **First-frame spawn** is called once before entering the main loop so the screen isn't blank for the first 3000 ms after boot. Without it, the player launches the game, sees a black screen, and has to wait three seconds before anything happens. The timer still drives every subsequent spawn — this is purely a "kick the first tick" call.
+ * **`elif event.type == spawn_director.spawn_event`** uses the director's exposed event id rather than importing it as a module constant. Keeps the event id encapsulated on the director (a future Stage 7 difficulty pass might want to swap to a different event for tier-2 spawns without touching `main.py`).
+ * **`Alien` import dropped** — main.py no longer constructs aliens directly; the director does. One less coupling to the sprite class from the entry point.
+ * **`Stage3Layout` import dropped** — the class is gone from `settings.py`. The Stage 3 demo loop is gone with it; the alien group simply starts empty and grows via the timer.
+ * **`WordManager(WordSettings.WORDLIST_PATH)`** vs the Stage 3 `WordManager()` no-arg call — passing the path triggers `_load_words`. If the file is missing, the `open()` inside `_load_words` raises a `FileNotFoundError` at boot, which is the right loud failure (silent empty pool would result in `pick_word` returning `None` forever and an apparently-broken-but-not-crashing game).
+ * **No new event handlers added** — RETURN, BACKSPACE, isalpha branches are unchanged. The kill path (`killed = word_manager.handle_enter()`; `killed.kill()`) automatically re-frees the killed alien's word for `pick_word` on the next spawn tick because `pick_word` builds its in-use set from the live alien group each call. No release-word bookkeeping needed.
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** docs/TODO.md
+**Date and Time:** 2026-05-03 10:42 UTC
+**Lines (at time of edit):** Stage 4 heading + 4 step boxes + new resolution paragraphs
+**Before:**
+    ### Stage 4 — Word list + spawning over time
+    [4 unchecked step boxes]
+**After:**
+    ### Stage 4 — Word list + spawning over time ✅
+    [4 checked step boxes]
+    **Resolution this stage:** the word pool lives on WordManager
+    (rather than a separate WordPool)... pick_word(in_use) is the
+    single read path... duplicate-word avoidance is per-spawn-tick...
+    SpawnDirector is a 70-line port vs the legacy 145-line version...
+    **Tunables landed:** WordSettings.WORDLIST_PATH plus a new
+    SpawnSettings carrying SPAWN_RATE = 3000 ms, SPAWN_Y = 80,
+    X_MARGIN = 80, COLORS = ('red','green','yellow','blue')...
+    **Stage3Layout deleted** as planned... **First-frame spawn** is
+    called once after SpawnDirector()... **Pool exhaustion is a
+    silent no-op** rather than a crash...
+**Why:** Same convention as Stage 0/1/2/3 entries — flip checkboxes, add ✅ to the heading, replace any "open question" paragraph with a "what we actually decided / what we built" set of paragraphs so a future session reading the TODO cold sees the resolutions inline. Three sub-paragraphs because Stage 4 made three meaningfully separate calls (where the pool lives, what tunables landed, what pre-existing code went away or got new behavior at the boundary).
+**Editor:** Claude Opus 4.7 via Cowork
+
+**File:** docs/TESTING.md
+**Date and Time:** 2026-05-03 10:42 UTC
+**Lines (at time of edit):** 41-47 (Stage 4 section)
+**Before:**
+    ## Stage 4 — Word list + spawning (not yet built)
+    [5 generic bullets covering interval spawn, words.txt source,
+     no-duplicates, varied x positions]
+**After:**
+    ## Stage 4 — Word list + spawning ✅
+    [8 specific bullets — first-frame spawn so the screen isn't
+     blank at boot, interval-driven subsequent spawns, words from
+     assets/words.txt rendered uppercase, no-duplicates verifiable
+     by inspection, varied x with X_MARGIN clipping protection,
+     shared-first-letter tie-break still resolves correctly,
+     pool-exhaustion silent no-op.]
+**Why:** Same pattern as TODO — flip "(not yet built)" to ✅ and harden hedged checks into definite ones. Three new bullets that didn't exist in the pre-stage version: the first-frame spawn check (regression hook for the "kick the first tick" call in main.py — easy to forget on a future rewrite), the shared-first-letter tie-break check (Stage 3 wrote the tie-break code but Stage 4 is the first stage that actually exercises it from random spawning), and the pool-exhaustion silent-no-op check (so the "every word on screen" edge case is verifiable from this file alone).
+**Editor:** Claude Opus 4.7 via Cowork
