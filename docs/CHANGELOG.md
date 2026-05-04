@@ -1129,7 +1129,108 @@ Stage 6 of the build plan lands: runs now end. The player has `HeartSettings.MAX
 **Why:** Same pattern as TODO — flip "(not yet built)" to ✅ and harden hedged checks into definite ones. Four new bullets the pre-stage version didn't have: the row-direction check (regression hook for the leftmost-empties-first rendering — easy to flip by accident if a future refactor mirrors the loop), the freeze-aliens-on-game-over check (regression hook for the `if game_active:` gate around `aliens.update()` — easy to break by hoisting the update outside the gate), the non-Enter-keys-ignored check (regression hook for the two-branch KEYDOWN split), and the lock-cleared-on-game-over check (regression hook for the explicit `word_manager.clear_lock()` call in the hearts-hit-zero branch — without it the game-over screen would still show a stale cyan prefix on the frozen alien that took the last heart).
 **Editor:** Claude Opus 4.7 via Cowork
 
-## 2026-05-03 20:41 UTC — Stage 7 score + per-color speed/points + difficulty ramp
+## 2026-05-04 — Comment cleanup sweep + Stage 8 BGM wiring
+
+Two distinct changes land in this entry: (1) a full-codebase comment-cleanup sweep stripping all stage-history narration, multi-paragraph rationale, and "future stage" references from every file touched in Stages 0–8; (2) Stage 8 audio completion — BGM now starts at game boot and stops on game-over, the duplicate `AudioSettings` class definition is merged into one, and the `print("kill")` / `print("miss")` stubs are removed.
+
+**File:** systems/spawn_director.py
+**Date and Time:** 2026-05-04 UTC
+**Lines (at time of edit):** 1-57 (rewritten, ~100 lines before → ~57 after)
+**Before:**
+    Multi-paragraph module docstring with stage history. __init__ /
+    spawn / adjust_difficulty all had verbose Args/Returns docstrings
+    with legacy cross-references and inline comments explaining why
+    set_timer jitter is fine.
+**After:**
+    One-liner module docstring. SpawnDirector class docstring is one
+    sentence. All method docstrings trimmed to 1-3 lines describing
+    what the method does. Inline comments limited to the pool-
+    exhaustion no-op (the one non-obvious branch).
+**Why:** Part of codebase-wide comment cleanup. All "Stage X:" narration, cross-references to legacy/, and multi-paragraph rationale blocks removed — that history lives in CHANGELOG.md, not in inline comments.
+**Editor:** Claude Sonnet 4.5 via Copilot
+
+**File:** systems/score_manager.py
+**Date and Time:** 2026-05-04 UTC
+**Lines (at time of edit):** 1-165 (rewritten, ~165 lines before → ~55 after)
+**Before:**
+    Module docstring with Stage 7 / Stage 9 narrative. Every method
+    had full Args/Returns docstrings with stage-history commentary.
+    Inline comments justified each design choice in prose.
+**After:**
+    One-liner module docstring. ScoreManager class docstring is 2
+    sentences. All method docstrings trimmed to 1 line. All inline
+    stage-history comment blocks removed.
+**Why:** Same cleanup pass.
+**Editor:** Claude Sonnet 4.5 via Copilot
+
+**File:** ui/hud.py
+**Date and Time:** 2026-05-04 UTC
+**Lines (at time of edit):** all (rewritten)
+**Before:**
+    Module docstring with Stage 6/7/9 roadmap. HeartsHUD, ScoreHUD,
+    GameOverScreen all had verbose class docstrings (legacy cross-
+    references, future-stage notes) and method docstrings with full
+    Args sections.
+**After:**
+    One-liner module docstring. Each class has a 1-sentence docstring.
+    __init__ methods have no docstrings (self-evident). draw() methods
+    have 1-line docstrings.
+**Why:** Same cleanup pass.
+**Editor:** Claude Sonnet 4.5 via Copilot
+
+**File:** ui/crt.py
+**Date and Time:** 2026-05-04 UTC
+**Lines (at time of edit):** all (rewritten)
+**Before:**
+    CRT class docstring "Creates a CRT monitor effect". __init__ had
+    a 4-line Args docstring. draw() had a 4-line summary docstring.
+    create_crt_lines() had a 1-line "Draws evenly-spaced horizontal
+    scanlines..." docstring.
+**After:**
+    CRT class docstring is 1 sentence. __init__, create_crt_lines,
+    draw() docstrings removed (behavior is self-evident from code).
+    draw() retains a 1-line docstring for the alpha flicker note.
+**Why:** Same cleanup pass.
+**Editor:** Claude Sonnet 4.5 via Copilot
+
+**File:** settings.py
+**Date and Time:** 2026-05-04 UTC
+**Lines (at time of edit):** AudioSettings (merged)
+**Before:**
+    class AudioSettings:   # stub — missing INTRO_VOL_BOOST + BGM_PLAYLIST
+        ...
+    class AudioSettings:   # full definition — shadowed the first one
+        INTRO_VOL_BOOST = 2.0
+        BGM_PLAYLIST = ['star_hero.ogg']
+        ...
+**After:**
+    class AudioSettings:   # single definition with all fields
+        DEFAULT_MASTER_VOLUME = 0.5
+        DEBUG_MUTE = False
+        INTRO_VOL_BOOST = 2.0
+        BGM_PLAYLIST = ['star_hero.ogg']
+        BASE_DIR / ASSETS_DIR / MUSIC_DIR / AUDIO_DIR
+**Why:** The second `class AudioSettings:` definition silently shadowed the first, meaning the first (stub) was dead code. Merged into one class so all AudioSettings fields are visible and no shadowing occurs. Stage 8 step 1 completion.
+**Editor:** Claude Sonnet 4.5 via Copilot
+
+**File:** main.py
+**Date and Time:** 2026-05-04 UTC
+**Lines (at time of edit):** run() — BGM wiring + stub removal
+**Before:**
+    audio.ensure_bgm_playing() not called at boot or on restart.
+    audio.stop_bgm() not called on game-over.
+    print("kill") in the kill branch.
+    print("miss") in the miss branch.
+    Stale comment "# Create laser targeting the alien" above audio.play('laser').
+**After:**
+    audio.ensure_bgm_playing() called once after game init.
+    audio.stop_bgm() called when hearts reach zero.
+    audio.ensure_bgm_playing() called in the restart branch.
+    print("kill") removed.
+    print("miss") removed.
+    Stale comment removed.
+**Why:** Stage 8 step 4 (BGM on game start) and cleanup of the Stage 2/5 print stubs that were placeholders until audio landed.
+**Editor:** Claude Sonnet 4.5 via Copilot
 
 Stage 7 of the build plan in `docs/TODO.md` lands. Word kills now award points (per-color, mirroring legacy `AlienSettings.POINTS`), the four alien colors fall at distinct per-color speeds (red slowest, blue fastest), the run score + persisted high-score render in the top-left, the high score persists across runs via `high_score.txt`, and `SpawnDirector.adjust_difficulty` re-arms the spawn timer at every `ScoreSettings.DIFFICULTY_STEP` threshold so spawn cadence visibly tightens as the score climbs (clamped at `MIN_SPAWN_RATE = 1200` ms). The initials-entry flow from the legacy `ScoreManager` is *not* ported here — `docs/TODO.md` §5 Stage 9 specifically owns the initials path, so Stage 7 keeps the storage half only. The same entry also reorganizes the bottom of `docs/TODO.md` to integrate Frankie's brainstorm notes into structured sections (§8 Observations, §9 Issues, §10 Brainstorm scratch), updates Q1 with a new "static ship + homing laser from bottom + point-of-no-return" option, updates Q6 to call out the three difficulty axes (length / speed / motion shape), and adds Q11 (word readability when many aliens are on screen).
 

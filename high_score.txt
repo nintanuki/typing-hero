@@ -1,1 +1,1 @@
-{"high_score": 4100, "leaderboard": []}
+{"high_score": 2000, "leaderboard": [{"name": "FBN", "score": 2000}]}

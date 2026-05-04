@@ -42,6 +42,7 @@ class FontSettings:
     MEDIUM = 20
     LARGE = 30
     COLOR = 'white'
+    DEFAULT_INITIALS = 'AAA'
 
 
 class AudioSettings:
@@ -143,11 +144,51 @@ class GameOverSettings:
 
     BANNER_TEXT = "GAME OVER"
     BANNER_SIZE = FontSettings.LARGE
+    SCORE_SIZE = FontSettings.MEDIUM
     PROMPT_TEXT = "PRESS ENTER TO RESTART"
+    INITIALS_PROMPT_TEXT = "PRESS ENTER TO SUBMIT"
     PROMPT_SIZE = FontSettings.MEDIUM
     COLOR = ColorSettings.COLORS['WHITE']
-    BANNER_OFFSET = 40   # px above screen center
-    PROMPT_OFFSET = 30   # px below screen center
+    CURSOR_COLOR = ColorSettings.COLORS['CYAN']
+    BANNER_CENTER_Y = 70
+    SCORE_CENTER_Y = 130
+    INITIALS_CENTER_Y = 210
+    LEADERBOARD_START_Y = 290
+    PROMPT_CENTER_Y = 730
+
+
+class LeaderboardSettings:
+    """Shared leaderboard table layout."""
+
+    TITLE = 'TOP 10'
+    ROW_HEIGHT = 22
+    SIZE = FontSettings.SMALL
+    COLOR = ColorSettings.COLORS['WHITE']
+
+
+class IntroSettings:
+    """Title screen layout and text."""
+
+    TITLE_TEXT = 'TYPING HERO'
+    TITLE_SIZE = FontSettings.LARGE
+    PROMPT_TEXT = 'PRESS ENTER TO PLAY'
+    PROMPT_SIZE = FontSettings.MEDIUM
+    HIGH_SCORE_TEXT_PREFIX = 'HIGH SCORE: '
+    HIGH_SCORE_SIZE = FontSettings.MEDIUM
+    COLOR = ColorSettings.COLORS['WHITE']
+    TITLE_CENTER_Y = 70
+    SHIP_CENTER_Y = 210
+    LEADERBOARD_START_Y = 330
+    HIGH_SCORE_CENTER_Y = 560
+    PROMPT_CENTER_Y = 720
+
+
+class PauseSettings:
+    """Pause-screen overlay text."""
+
+    TEXT = 'PAUSED'
+    SIZE = FontSettings.LARGE
+    COLOR = ColorSettings.COLORS['WHITE']
 
 
 class ScoreSettings:

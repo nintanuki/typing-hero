@@ -311,31 +311,29 @@ Each stage is small enough to finish, run, and *see something change* in one sit
 
 **Tuning checkpoint.** Play it. Are misses too punishing? Adjust alien speed and spawn rate before moving on. (Q5.) Time-to-miss is currently ~12 s per alien at `AlienSettings.SPEED = 0.5`; with 3 hearts that's a generous window before the run ends. If it feels too long (run never ends in practice), bump SPEED first, then SPAWN_RATE down. If it feels too short (every miss compounds before you can read the next word), lower SPEED to 0.4.
 
-### Stage 7 — Score + simple difficulty ramp (SOME CREATIVE DECISIONS HAVE BEEN MADE AHEAD OF THIS STAGE THAT WERE NOT ADDED TO THE CHANGELOG, SUCH AS ADDING THE LASER, ALIEN NO LONGER STOPS MOVING WHEN TARGETED, EXPLOSION AND BACKGROUND ANIMATION, ETC. PLEASE ADAPT AND REFACTOR AS NECESSARY)
-
-ANIMATIONS, SOUND EFFECTS, ETC. CHECK THE CODE FIRST AND ADAPT! IT MIGHT HAVE BEEN MESSY SO REFACTOR IF NECESSARY BUT KEEP FUNCTIONALITY)
+### Stage 7 — Score + simple difficulty ramp ✅
 **Goal:** Word kills award points (varied by alien color). Score visible top-left. Per-color fall speed lands so the four colors carry distinct motion identity. Spawn rate ramps down as score climbs.
 
 **Steps:**
 
-- [ ] 1. Port `ScoreManager` from `legacy/systems/managers.py` — score field, JSON save/load to `high_score.txt`, `reset()` for new runs. **Defer the initials entry flow to Stage 9** (TODO §5 Stage 9 specifically owns "if keeping leaderboards, port `ScoreManager` initials entry path"). Stage 7 only needs the score and the high-score persistence.
-- [ ] 2. Award points per kill via `AlienSettings.POINTS[color]`. Per-color values mirror legacy (red 100, green 200, yellow 300, blue 500) — see §8 O1 ("be faithful"). Word-length bonuses (Q6's other axis) deferred to Stage 10 alongside the per-difficulty word lists.
-- [ ] 3. Promote `AlienSettings.SPEED` from a single float to a per-color dict (red < green < yellow < blue). Values scaled from legacy 60-FPS numbers down for typing pace — the harder-color = faster + more-points contract from Q6 lands here in one pass. Yellow zigzag motion (per Frankie's note 2 / §2 update) is a follow-up step deferred to Stage 8 polish; Stage 7's yellow falls straight down, just faster than green.
-- [ ] 4. Add `ScoreHUD` in `ui/hud.py` — top-left, mirrors legacy `display_in_game_score` (small high-score row, medium current-score below).
-- [ ] 5. Port `SpawnDirector.adjust_difficulty` — every `ScoreSettings.DIFFICULTY_STEP` points, drop spawn interval by `SPAWN_RATE_DROP` (clamped to `MIN_SPAWN_RATE`). Re-arm the pygame timer with `pygame.time.set_timer`. Per-frame *fall* speed scaling deferred — per-color SPEED already gives the difficulty gradient in step 3, and adding a multiplier on top makes balance tuning a two-knob problem.
-- [ ] 6. Smoke test: score climbs, high-score persists across restarts, spawn rate visibly tightens at the first difficulty step, the four colors fall at visibly different speeds, ramp tops out without becoming unplayable.
+- [x] 1. Port `ScoreManager` from `legacy/systems/managers.py` — score field, JSON save/load to `high_score.txt`, `reset()` for new runs. **Defer the initials entry flow to Stage 9** (TODO §5 Stage 9 specifically owns "if keeping leaderboards, port `ScoreManager` initials entry path"). Stage 7 only needs the score and the high-score persistence.
+- [x] 2. Award points per kill via `AlienSettings.POINTS[color]`. Per-color values mirror legacy (red 100, green 200, yellow 300, blue 500) — see §8 O1 ("be faithful"). Word-length bonuses (Q6's other axis) deferred to Stage 10 alongside the per-difficulty word lists.
+- [x] 3. Promote `AlienSettings.SPEED` from a single float to a per-color dict (red < green < yellow < blue). Values scaled from legacy 60-FPS numbers down for typing pace — the harder-color = faster + more-points contract from Q6 lands here in one pass. Yellow zigzag motion (per Frankie's note 2 / §2 update) is a follow-up step deferred to Stage 8 polish; Stage 7's yellow falls straight down, just faster than green.
+- [x] 4. Add `ScoreHUD` in `ui/hud.py` — top-left, mirrors legacy `display_in_game_score` (small high-score row, medium current-score below).
+- [x] 5. Port `SpawnDirector.adjust_difficulty` — every `ScoreSettings.DIFFICULTY_STEP` points, drop spawn interval by `SPAWN_RATE_DROP` (clamped to `MIN_SPAWN_RATE`). Re-arm the pygame timer with `pygame.time.set_timer`. Per-frame *fall* speed scaling deferred — per-color SPEED already gives the difficulty gradient in step 3, and adding a multiplier on top makes balance tuning a two-knob problem.
+- [x] 6. Smoke test: score climbs, high-score persists across restarts, spawn rate visibly tightens at the first difficulty step, the four colors fall at visibly different speeds, ramp tops out without becoming unplayable.
 
-### Stage 8 — Audio + explosion polish
+### Stage 8 — Audio + explosion polish ✅
 **Goal:** Laser SFX on kill, explosion sprite + SFX at killed alien's position, background music.
 
 **Steps:**
 
-- [ ] 1. Port `Audio` system from `legacy/systems/audio.py`. Drop powerup-related cue keys we don't use.
+- [x] 1. Port `Audio` system from `legacy/systems/audio.py`. Drop powerup-related cue keys we don't use.
 - [x] 2. Port `Explosion` sprite from `legacy/core/animations.py`.
 - [x] 3. On a successful kill: spawn an explosion at the alien's position, play `explosion`. Also play `laser` sound (consider: does laser play on key-press, on full-word completion, or both? Probably full-word.).
-- [ ] 4. Start `star_hero.ogg` BGM on game start. (Optionally re-theme the music later.)
-- [ ] 5. Port `Background` scroll + `CRT` shader for visual flavor (later BG and aliens will move faster with levels, also harder words on harder levels?)
-- [ ] 6. Smoke test: feels arcade-y. Audio doesn't stutter.
+- [x] 4. Start `star_hero.ogg` BGM on game start. (Optionally re-theme the music later.)
+- [x] 5. Port `Background` scroll + `CRT` shader for visual flavor (later BG and aliens will move faster with levels, also harder words on harder levels?)
+- [x] 6. Smoke test: feels arcade-y. Audio doesn't stutter.
 
 ### Stage 9 — Menus + leaderboard
 **Goal:** Title screen → game → game over → optional initials entry → restart loop. Pause works.
