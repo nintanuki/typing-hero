@@ -33,6 +33,7 @@ import sys
 
 import pygame
 
+from core.animations import Background
 from core.sprites import KillLaser
 from settings import (
     FontSettings,
@@ -52,7 +53,7 @@ from ui.crt import CRT
 def run() -> None:
     """Initialize pygame and run the main loop until the user quits."""
     pygame.init()
-    screen = pygame.display.set_mode(ScreenSettings.RESOLUTION)
+    screen = pygame.display.set_mode((ScreenSettings.RESOLUTION), pygame.SCALED)
     crt = CRT(screen)
     pygame.display.set_caption(ScreenSettings.TITLE)
     clock = pygame.time.Clock()
@@ -63,6 +64,10 @@ def run() -> None:
     # for the first SPAWN_RATE ms after boot, and so the Stage 4 smoke
     # test ("aliens appear at the top every couple seconds") sees an
     # alien within the first frame instead of after the first interval.
+    # Create a dedicated group for the background so it stays behind aliens/lasers
+    bg_group = pygame.sprite.GroupSingle() 
+    background = Background(bg_group)
+    
     aliens = pygame.sprite.Group()
     lasers = pygame.sprite.Group()
     explosions = pygame.sprite.Group()
@@ -141,6 +146,11 @@ def run() -> None:
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
+                # Add the F11 toggle here
+                elif event.key == pygame.K_F11:
+                    # pygame.display.toggle_fullscreen() is the cleanest way to do this
+                    # It flips the window between windowed and fullscreen modes
+                    pygame.display.toggle_fullscreen()
                 elif game_active:
                     if event.key == pygame.K_RETURN:
                         # Enter commits the buffer. The manager returns
@@ -225,6 +235,12 @@ def run() -> None:
         # them), which keeps the playfield as a backdrop for the banner
         # without continuing to take damage from below.
         if game_active:
+            # Calculate delta_time in seconds for frame-rate independence
+            dt = clock.get_time() / 1000.0 
+            
+            # Update background first
+            bg_group.update(dt, 1.0) # Using 1.0 multiplier for now
+            
             # Stage 5: advance every alien one frame of vertical motion
             # before the render pass. Group.update() forwards to each
             # sprite's update(), which mutates rect.y from the float
@@ -280,6 +296,7 @@ def run() -> None:
                         break
 
         screen.fill(ScreenSettings.BG_COLOR)
+        bg_group.draw(screen)
         aliens.draw(screen)
         lasers.draw(screen)
         explosions.draw(screen)
