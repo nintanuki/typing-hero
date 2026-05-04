@@ -64,11 +64,32 @@ class AudioSettings:
     AUDIO_DIR = os.path.join(ASSETS_DIR, 'audio')
 
 
+class AudioSettings:
+    """
+    Defines settings related to audio in the game,
+    including the volume boost applied during the intro sequence
+    and the default master volume level for all sounds.
+    """
+    INTRO_VOL_BOOST = 2.0
+    DEFAULT_MASTER_VOLUME = 0.5 # default value is 1.0
+    DEBUG_MUTE = False # set True to silence all audio for debugging
+    # All bundled media now lives under a single assets/ folder
+    # (assets/audio, assets/font, assets/graphics, assets/music) so the
+    # project root only carries code + docs + saves.
+    BASE_DIR = os.path.dirname(__file__)
+    ASSETS_DIR = os.path.join(BASE_DIR, 'assets')
+    MUSIC_DIR = os.path.join(ASSETS_DIR, 'music')
+    AUDIO_DIR = os.path.join(ASSETS_DIR, 'audio')
+    BGM_PLAYLIST = [
+        'star_hero.ogg'
+    ]
+
 class AssetPaths:
     """Filesystem paths to bundled graphics used by the game."""
 
     BASE_DIR = os.path.dirname(__file__)
     ASSETS_DIR = os.path.join(BASE_DIR, 'assets')
+    
     GRAPHICS_DIR = os.path.join(ASSETS_DIR, 'graphics')
     BACKGROUND = os.path.join(GRAPHICS_DIR, 'background.png')
     EXPLOSION = os.path.join(GRAPHICS_DIR, 'explosion.png')
@@ -76,6 +97,22 @@ class AssetPaths:
     HEART = os.path.join(GRAPHICS_DIR, 'heart.png')
     TV = os.path.join(GRAPHICS_DIR, 'tv.png')
 
+    # # Sounds
+    # AUDIO_DIR = os.path.join(ASSETS_DIR, 'audio')
+    # LASER = os.path.join(AUDIO_DIR, 'laser.ogg')
+    # HYPER = os.path.join(AUDIO_DIR, 'hyper.ogg')
+    # EXPLOSION = os.path.join(AUDIO_DIR, 'explosion.ogg')
+    # UFO = os.path.join(AUDIO_DIR, 'ufo.ogg')
+    # PAUSE = os.path.join(AUDIO_DIR, 'sfx_sounds_pause2_in.ogg')
+    # UNPAUSE = os.path.join(AUDIO_DIR, 'sfx_sounds_pause2_out.ogg')
+
+    # # Music
+    # MUSIC_DIR = os.path.join(ASSETS_DIR, 'music')
+    # INTRO_MUSIC = os.path.join(MUSIC_DIR, 'star_hero_intro.ogg')
+    # PLAYER_DOWN = os.path.join(MUSIC_DIR, 'game_over.ogg')
+    # BGM_PLAYLIST = [
+    #     os.path.join(MUSIC_DIR, 'star_hero.ogg'),
+    # ]
 
 class WordSettings:
     """Tunables for rendering the word floating above each alien."""

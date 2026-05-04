@@ -44,6 +44,7 @@ from settings import (
 from systems.score_manager import ScoreManager
 from systems.spawn_director import SpawnDirector
 from systems.word_manager import WordManager
+from systems.audio import Audio
 from ui.hud import GameOverScreen, HeartsHUD, ScoreHUD
 from ui.crt import CRT
 
@@ -88,6 +89,8 @@ def run() -> None:
     # First-frame spawn so the player sees something immediately rather
     # than waiting out the full timer interval at boot.
     spawn_director.spawn(aliens, word_manager)
+
+    audio = Audio()
 
     # Stage 6/7: HUD + game-over overlay. Each pre-rasterizes / caches
     # its rendering bits at construction so per-frame draws are just
