@@ -311,7 +311,7 @@ Each stage is small enough to finish, run, and *see something change* in one sit
 
 **Tuning checkpoint.** Play it. Are misses too punishing? Adjust alien speed and spawn rate before moving on. (Q5.) Time-to-miss is currently ~12 s per alien at `AlienSettings.SPEED = 0.5`; with 3 hearts that's a generous window before the run ends. If it feels too long (run never ends in practice), bump SPEED first, then SPAWN_RATE down. If it feels too short (every miss compounds before you can read the next word), lower SPEED to 0.4.
 
-### Stage 7 — Score + simple difficulty ramp (SOME CREATIVE DECISIONS HAVE BEEN MADE AHEAD OF THIS THAT WERE NOT ADDED TO THE CHANGELOG, SUCH AS ADDING THE LASER, ALIEN NO LONGER STOPS MOVING WHEN TARGETED, EXPLOSION ANIMATIONS, ETC. CHECK THE CODE FIRST AND ADAPT! IT MIGHT HAVE BEEN MESSY SO REFACTOR IF NECESSARY BUT KEEP FUNCTIONALITY)
+### Stage 7 — Score + simple difficulty ramp (SOME CREATIVE DECISIONS HAVE BEEN MADE AHEAD OF THIS THAT WERE NOT ADDED TO THE CHANGELOG, SUCH AS ADDING THE LASER, ALIEN NO LONGER STOPS MOVING WHEN TARGETED, EXPLOSION AND BACKGROUND ANIMATIONS, SOUND EFFECTS, ETC. CHECK THE CODE FIRST AND ADAPT! IT MIGHT HAVE BEEN MESSY SO REFACTOR IF NECESSARY BUT KEEP FUNCTIONALITY)
 **Goal:** Word kills award points (varied by alien color). Score visible top-left. Per-color fall speed lands so the four colors carry distinct motion identity. Spawn rate ramps down as score climbs.
 
 **Steps:**
@@ -330,7 +330,7 @@ Each stage is small enough to finish, run, and *see something change* in one sit
 
 - [ ] 1. Port `Audio` system from `legacy/systems/audio.py`. Drop powerup-related cue keys we don't use.
 - [x] 2. Port `Explosion` sprite from `legacy/core/animations.py`.
-- [ ] 3. On a successful kill: spawn an explosion at the alien's position, play `explosion`. Also play `laser` sound (consider: does laser play on key-press, on full-word completion, or both? Probably full-word.).
+- [x] 3. On a successful kill: spawn an explosion at the alien's position, play `explosion`. Also play `laser` sound (consider: does laser play on key-press, on full-word completion, or both? Probably full-word.).
 - [ ] 4. Start `star_hero.ogg` BGM on game start. (Optionally re-theme the music later.)
 - [ ] 5. Port `Background` scroll + `CRT` shader for visual flavor (later BG and aliens will move faster with levels, also harder words on harder levels?)
 - [ ] 6. Smoke test: feels arcade-y. Audio doesn't stutter.
