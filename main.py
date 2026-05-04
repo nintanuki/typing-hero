@@ -75,27 +75,28 @@ def run() -> None:
                 elif state == 'intro':
                     if event.key == pygame.K_RETURN:
                         _start_game(
-                            aliens, word_manager, spawn_director, audio
+                            aliens, word_manager, spawn_director, audio, bg_group
                         )
                         hearts = HeartSettings.MAX
                         state = 'playing'
 
                 elif state == 'playing':
-                    if event.key == pygame.K_RETURN:
+                    if event.key == pygame.K_SPACE:
                         if word_manager.current_prefix:
                             # Mid-word: try to fire.
                             killed = word_manager.handle_enter()
                             if killed is not None:
                                 scores.add_for_color(killed.color)
                                 spawn_director.adjust_difficulty(scores.score)
+                                spawn_director.sync_background_speed(bg_group, scores.score)
                                 audio.play('laser')
                                 lasers.add(KillLaser(killed, explosions, audio))
                                 killed.is_dying = True
-                        else:
-                            # Idle: Enter toggles pause.
-                            audio.play('pause')
-                            audio.pause_music()
-                            state = 'paused'
+                    elif event.key == pygame.K_RETURN:
+                        # Enter toggles pause.
+                        audio.play('pause')
+                        audio.pause_music()
+                        state = 'paused'
                     elif event.key == pygame.K_BACKSPACE:
                         word_manager.handle_backspace()
                     elif event.unicode.isalpha():
@@ -124,7 +125,7 @@ def run() -> None:
                         if event.key == pygame.K_RETURN:
                             _restart_game(
                                 aliens, lasers, explosions,
-                                word_manager, spawn_director, scores, audio
+                                word_manager, spawn_director, scores, audio, bg_group
                             )
                             hearts = HeartSettings.MAX
                             state = 'playing'
@@ -134,8 +135,13 @@ def run() -> None:
                     spawn_director.spawn(aliens, word_manager)
 
         # --- Update ---
+        current_level = spawn_director.level(scores.score)
+
+        if state in ('intro', 'playing', 'game_over'):
+            bg_group.update(dt)
+
         if state == 'playing':
-            bg_group.update(dt, 1.0)
+            audio.ensure_bgm_playing()
             aliens.update()
             lasers.update()
             explosions.update()
@@ -146,10 +152,16 @@ def run() -> None:
                         word_manager.clear_lock()
                     alien.kill()
                     hearts -= 1
+                    if hearts == 2:
+                        audio.play('alarm_med')
+                    elif hearts == 1:
+                        audio.play('alarm_low')
                     if hearts <= 0:
+                        hearts = 0
                         word_manager.clear_lock()
                         scores.finalize_game_over()
-                        audio.stop_bgm()
+                        audio.stop_alarms()
+                        audio.play_game_over_music()
                         state = 'game_over'
                         break
 
@@ -159,7 +171,8 @@ def run() -> None:
 
         if state == 'intro':
             intro_screen.draw(screen, scores)
-        else:
+
+        elif state in ('playing', 'paused'):
             aliens.draw(screen)
             lasers.draw(screen)
             explosions.draw(screen)
@@ -182,15 +195,15 @@ def run() -> None:
                     )
                     screen.blit(buffer_surf, buffer_rect)
                 hearts_hud.draw(screen, hearts)
-                score_hud.draw(screen, scores.score, scores.high_score)
+                score_hud.draw(screen, scores.score, scores.high_score, current_level)
 
             elif state == 'paused':
                 hearts_hud.draw(screen, hearts)
-                score_hud.draw(screen, scores.score, scores.high_score)
+                score_hud.draw(screen, scores.score, scores.high_score, current_level)
                 pause_screen.draw(screen)
 
-            elif state == 'game_over':
-                game_over_screen.draw(screen, scores.score, scores)
+        elif state == 'game_over':
+            game_over_screen.draw(screen, scores.score, scores)
 
         crt.draw()
         pygame.display.flip()
@@ -199,15 +212,18 @@ def run() -> None:
     pygame.quit()
 
 
-def _start_game(aliens, word_manager, spawn_director, audio):
+def _start_game(aliens, word_manager, spawn_director, audio, bg_group):
     """Transition from intro to playing: stop intro music, start BGM, first spawn."""
     audio.stop_intro_music()
+    audio.stop_bgm()
+    audio.stop_alarms()
     audio.ensure_bgm_playing()
     spawn_director.adjust_difficulty(0)
+    spawn_director.sync_background_speed(bg_group, 0)
     spawn_director.spawn(aliens, word_manager)
 
 
-def _restart_game(aliens, lasers, explosions, word_manager, spawn_director, scores, audio):
+def _restart_game(aliens, lasers, explosions, word_manager, spawn_director, scores, audio, bg_group):
     """Reset all per-run state and begin a new run."""
     for alien in list(aliens):
         alien.kill()
@@ -215,7 +231,10 @@ def _restart_game(aliens, lasers, explosions, word_manager, spawn_director, scor
     explosions.empty()
     word_manager.clear_lock()
     scores.reset()
+    audio.stop_alarms()
+    audio.stop_bgm()
     spawn_director.adjust_difficulty(0)
+    spawn_director.sync_background_speed(bg_group, 0)
     spawn_director.spawn(aliens, word_manager)
     audio.ensure_bgm_playing()
 

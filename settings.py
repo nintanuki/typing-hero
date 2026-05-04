@@ -144,16 +144,21 @@ class GameOverSettings:
 
     BANNER_TEXT = "GAME OVER"
     BANNER_SIZE = FontSettings.LARGE
+    HIGH_SCORE_CENTER_Y = 520
     SCORE_SIZE = FontSettings.MEDIUM
-    PROMPT_TEXT = "PRESS ENTER TO RESTART"
+    SCORE_CENTER_Y = 560
+    PROMPT_TEXT = "PRESS ENTER TO PLAY AGAIN"
     INITIALS_PROMPT_TEXT = "PRESS ENTER TO SUBMIT"
+    NEW_HIGH_SCORE_TEXT = 'NEW HIGH SCORE! ENTER YOUR INITIALS'
     PROMPT_SIZE = FontSettings.MEDIUM
     COLOR = ColorSettings.COLORS['WHITE']
     CURSOR_COLOR = ColorSettings.COLORS['CYAN']
+    NEW_HIGH_SCORE_COLOR = ColorSettings.COLORS['YELLOW']
     BANNER_CENTER_Y = 70
-    SCORE_CENTER_Y = 130
-    INITIALS_CENTER_Y = 210
-    LEADERBOARD_START_Y = 290
+    INITIALS_CENTER_Y = 180
+    INITIALS_PROMPT_CENTER_Y = 125
+    LEADERBOARD_START_Y = 130
+    INITIALS_LEADERBOARD_START_Y = 220
     PROMPT_CENTER_Y = 730
 
 
@@ -197,12 +202,15 @@ class ScoreSettings:
     SAVE_FILENAME = 'high_score.txt'
     SAVE_PATH = os.path.join(os.path.dirname(__file__), SAVE_FILENAME)
 
-    DIFFICULTY_STEP = 5000    # points between ramp steps
+    DIFFICULTY_STEP = 2500    # points between ramp steps
+    MAX_LEVEL = 20
     SPAWN_RATE_DROP = 200     # ms removed per step
     MIN_SPAWN_RATE = 1200     # ms floor (9 steps from 3000 ms)
 
     HIGH_SCORE_TOPLEFT = (10, 5)
     SCORE_TOPLEFT = (10, 20)
+    LEVEL_BOTTOMLEFT = (10, ScreenSettings.HEIGHT - 36)
     HIGH_SCORE_SIZE = FontSettings.SMALL
     SCORE_SIZE = FontSettings.MEDIUM
+    LEVEL_SIZE = FontSettings.SMALL
     COLOR = ColorSettings.COLORS['WHITE']

@@ -59,9 +59,12 @@ class ScoreHUD:
         self._score_font = pygame.font.Font(
             FontSettings.FONT, ScoreSettings.SCORE_SIZE
         )
+        self._level_font = pygame.font.Font(
+            FontSettings.FONT, ScoreSettings.LEVEL_SIZE
+        )
 
-    def draw(self, surface, score, high_score):
-        """Render the high-score row above the current-score row."""
+    def draw(self, surface, score, high_score, level):
+        """Render the top-left score block and bottom-left level readout."""
         high_surf = self._high_score_font.render(
             f'HIGH SCORE: {high_score}', True, ScoreSettings.COLOR
         )
@@ -72,16 +75,26 @@ class ScoreHUD:
         )
         surface.blit(score_surf, ScoreSettings.SCORE_TOPLEFT)
 
+        level_surf = self._level_font.render(
+            f'LEVEL: {level}', True, ScoreSettings.COLOR
+        )
+        level_rect = level_surf.get_rect(bottomleft=ScoreSettings.LEVEL_BOTTOMLEFT)
+        surface.blit(level_surf, level_rect)
+
 
 class GameOverScreen:
     """Renders the game-over banner, run score, initials entry or leaderboard, and prompt."""
 
     def __init__(self):
         banner_font = pygame.font.Font(FontSettings.FONT, GameOverSettings.BANNER_SIZE)
+        self._high_score_font = pygame.font.Font(
+            FontSettings.FONT, GameOverSettings.SCORE_SIZE
+        )
         self._score_font = pygame.font.Font(FontSettings.FONT, GameOverSettings.SCORE_SIZE)
         self._initials_font = pygame.font.Font(FontSettings.FONT, GameOverSettings.BANNER_SIZE)
         self._lb_font = pygame.font.Font(FontSettings.FONT, LeaderboardSettings.SIZE)
         prompt_font = pygame.font.Font(FontSettings.FONT, GameOverSettings.PROMPT_SIZE)
+        self._new_high_score_font = pygame.font.Font(FontSettings.FONT, FontSettings.SMALL)
 
         self._banner_surf = banner_font.render(
             GameOverSettings.BANNER_TEXT.upper(), True, GameOverSettings.COLOR
@@ -92,9 +105,10 @@ class GameOverScreen:
         self._initials_prompt_surf = prompt_font.render(
             GameOverSettings.INITIALS_PROMPT_TEXT.upper(), True, GameOverSettings.COLOR
         )
-        self._hint_font = pygame.font.Font(FontSettings.FONT, FontSettings.SMALL)
-        self._hint_surf = self._hint_font.render(
-            'UP/DN: CHANGE  L/R: MOVE', True, GameOverSettings.COLOR
+        self._new_high_score_surf = self._new_high_score_font.render(
+            GameOverSettings.NEW_HIGH_SCORE_TEXT.upper(),
+            True,
+            GameOverSettings.NEW_HIGH_SCORE_COLOR,
         )
 
         cx = ScreenSettings.WIDTH // 2
@@ -107,12 +121,22 @@ class GameOverScreen:
         self._initials_prompt_rect = self._initials_prompt_surf.get_rect(
             center=(cx, GameOverSettings.PROMPT_CENTER_Y)
         )
+        self._new_high_score_rect = self._new_high_score_surf.get_rect(
+            center=(cx, GameOverSettings.INITIALS_PROMPT_CENTER_Y)
+        )
 
     def draw(self, surface, score, scores):
-        """Draw banner, run score, then either initials entry or leaderboard + prompt."""
+        """Draw the legacy-style game-over screen and leaderboard."""
         cx = ScreenSettings.WIDTH // 2
 
         surface.blit(self._banner_surf, self._banner_rect)
+
+        high_score_surf = self._high_score_font.render(
+            f'HIGH SCORE: {scores.high_score}', True, GameOverSettings.COLOR
+        )
+        surface.blit(high_score_surf, high_score_surf.get_rect(
+            center=(cx, GameOverSettings.HIGH_SCORE_CENTER_Y)
+        ))
 
         score_surf = self._score_font.render(
             f'YOUR SCORE: {score}', True, GameOverSettings.COLOR
@@ -122,19 +146,17 @@ class GameOverScreen:
         ))
 
         if scores.entering_initials:
+            surface.blit(self._new_high_score_surf, self._new_high_score_rect)
             self._draw_initials(surface, scores.initials, scores.initials_index)
-            hint_rect = self._hint_surf.get_rect(
-                center=(cx, GameOverSettings.INITIALS_CENTER_Y + 45)
-            )
-            surface.blit(self._hint_surf, hint_rect)
             surface.blit(self._initials_prompt_surf, self._initials_prompt_rect)
+            leaderboard_y = GameOverSettings.INITIALS_LEADERBOARD_START_Y
         else:
-            lb = scores.save_data.get('leaderboard', [])
-            if lb:
-                _draw_leaderboard(
-                    surface, lb, self._lb_font, GameOverSettings.LEADERBOARD_START_Y
-                )
             surface.blit(self._prompt_surf, self._prompt_rect)
+            leaderboard_y = GameOverSettings.LEADERBOARD_START_Y
+
+        lb = scores.save_data.get('leaderboard', [])
+        if lb:
+            _draw_leaderboard(surface, lb, self._lb_font, leaderboard_y)
 
     def _draw_initials(self, surface, initials, cursor_idx):
         """Render the 3-letter initials with cursor highlighting."""

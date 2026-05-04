@@ -40,10 +40,30 @@ class SpawnDirector:
 
         Returns the new interval in ms.
         """
-        steps = max(0, score) // ScoreSettings.DIFFICULTY_STEP
+        steps = self.level(score) - 1
         new_rate = max(
             ScoreSettings.MIN_SPAWN_RATE,
             SpawnSettings.SPAWN_RATE - (steps * ScoreSettings.SPAWN_RATE_DROP),
         )
         pygame.time.set_timer(self.spawn_event, new_rate)
         return new_rate
+
+    def level(self, score):
+        """Return the current level derived from score, capped at ``MAX_LEVEL``."""
+        base_level = (max(0, score) // ScoreSettings.DIFFICULTY_STEP) + 1
+        return min(ScoreSettings.MAX_LEVEL, base_level)
+
+    def background_speed(self, score):
+        """Return the background scroll speed for the current score tier."""
+        steps = self.level(score) - 1
+        return min(
+            ScreenSettings.BG_SCROLL_MAX,
+            ScreenSettings.DEFAULT_BG_SCROLL_SPEED + (steps * ScreenSettings.BG_SCROLL_STEP),
+        )
+
+    def sync_background_speed(self, backgrounds, score):
+        """Apply the current difficulty's background speed to every background sprite."""
+        new_speed = self.background_speed(score)
+        for background in backgrounds:
+            background.scroll_speed = new_speed
+        return new_speed

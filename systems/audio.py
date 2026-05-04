@@ -199,6 +199,11 @@ class Audio:
         if self.bg_music is not None:
             self.channels['bg_music'].play(self.bg_music)
 
+    def play_game_over_music(self) -> None:
+        """Swap the gameplay-music channel to the game-over track."""
+        self.stop_bgm()
+        self.channels['bg_music'].play(self.player_down)
+
     def stop_bgm(self) -> None:
         """Halt background music immediately."""
         self.channels['bg_music'].stop()
