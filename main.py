@@ -64,6 +64,7 @@ def run() -> None:
     # alien within the first frame instead of after the first interval.
     aliens = pygame.sprite.Group()
     lasers = pygame.sprite.Group()
+    explosions = pygame.sprite.Group()
 
     # Fonts are loaded once and passed into render paths so we never
     # call pygame.font.Font(...) inside the per-frame loop. The word
@@ -163,7 +164,7 @@ def run() -> None:
                             spawn_director.adjust_difficulty(scores.score)
 
                             # Create laser targeting the alien
-                            new_laser = KillLaser(killed)
+                            new_laser = KillLaser(killed, explosions)
                             lasers.add(new_laser)
 
                             # Mark the alien so it doesn't cause damage or take more input
@@ -228,6 +229,7 @@ def run() -> None:
             aliens.update()
 
             lasers.update()
+            explosions.update()
 
             # Stage 5: miss detection. Iterate a snapshot of the group
             # (``list(aliens)``) because alien.kill() mutates the group
@@ -274,6 +276,7 @@ def run() -> None:
         screen.fill(ScreenSettings.BG_COLOR)
         aliens.draw(screen)
         lasers.draw(screen)
+        explosions.draw(screen)
         for alien in aliens:
             # Only the targeted alien gets a non-zero prefix_length;
             # every other alien renders its whole word in

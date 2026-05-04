@@ -13,6 +13,7 @@ import os
 
 import pygame
 
+from core.animations import Explosion
 from settings import AlienSettings, AssetPaths, ColorSettings, ScreenSettings, WordSettings
 
 
@@ -167,7 +168,7 @@ class Alien(pygame.sprite.Sprite):
 
 class KillLaser(pygame.sprite.Sprite):
     """A vertical beam that shoots up from the bottom of the screen to destroy an alien."""
-    def __init__(self, target_alien):
+    def __init__(self, target_alien, explosion_group):
         """
         Create a laser aimed at the given alien.
         Args:
@@ -184,6 +185,7 @@ class KillLaser(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(midbottom=(target_alien.rect.centerx, ScreenSettings.HEIGHT))
         
         self.target = target_alien
+        self.explosion_group = explosion_group
         self.speed = -8
 
     def update(self):
@@ -194,6 +196,13 @@ class KillLaser(pygame.sprite.Sprite):
         # We check BOTH a collision and if the laser has passed the alien's center.
         # This prevents the laser from "teleporting" past the alien at high speeds.
         if self.rect.colliderect(self.target.rect) or self.rect.top <= self.target.rect.centery:
+            # CREATE: We create the actual instance right here.
+            impact_explosion = Explosion(self.target.rect.centerx, self.target.rect.centery)
+            self.explosion_group.add(impact_explosion)
+            # JOIN: We add it to the groups the alien already belongs to.
+            # Since the alien is in the 'aliens' group in main_3.py, 
+            # the explosion joins that same group.
+
             print("Impact!") # This will now trigger
             self.target.kill() # Remove the alien
             self.kill()        # Remove the laser

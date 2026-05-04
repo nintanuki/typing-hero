@@ -198,6 +198,16 @@ class AlienSettings:
         'blue':   500,
     }
 
+class ExplosionSettings:
+    """
+    Contains all the settings related to explosion animations,
+    including the number of frames in the sprite sheet, animation speed,
+    size of each frame, and scale for rendering.
+    """
+    FRAMES = 7 # there are seven unique images in the explosion sprite sheet
+    ANIMATION_SPEED = 0.15 # smaller numbers = slower explosion animation. Always 0.x
+    SIZE = 192 # size of each frame in the spritesheet, definse both width and height
+    SCALE = 0.5
 
 class TypingSettings:
     """Tunables for capturing player typing and rendering the typing buffer.
