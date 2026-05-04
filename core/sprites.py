@@ -13,7 +13,7 @@ import os
 
 import pygame
 
-from settings import AlienSettings, AssetPaths, WordSettings
+from settings import AlienSettings, AssetPaths, ColorSettings, ScreenSettings, WordSettings
 
 
 class Alien(pygame.sprite.Sprite):
@@ -58,6 +58,7 @@ class Alien(pygame.sprite.Sprite):
         # rounded mirror updated in ``update``. Mirrors the legacy
         # ``apply_movement`` pattern in ``legacy/core/sprites.py``.
         self.position = pygame.math.Vector2(self.rect.topleft)
+        self.is_dying = False
 
     def update(self):
         """Advance one frame of motion.
@@ -81,12 +82,15 @@ class Alien(pygame.sprite.Sprite):
         Returns:
             None. Mutates ``self.position`` and ``self.rect``.
         """
-        self.position.y += AlienSettings.SPEED[self.color]
-        # ``round`` (vs ``int``) keeps the rect honest at the half-
-        # pixel boundary — at SPEED=0.5 the alien drops 1 px every two
-        # frames rather than oscillating between flooring and ceiling.
-        # The same logic applies for the other colors at their floats.
-        self.rect.y = round(self.position.y)
+        if not self.is_dying:
+            self.position.y += AlienSettings.SPEED[self.color]
+            # ``round`` (vs ``int``) keeps the rect honest at the half-
+            # pixel boundary — at SPEED=0.5 the alien drops 1 px every two
+            # frames rather than oscillating between flooring and ceiling.
+            # The same logic applies for the other colors at their floats.
+            self.rect.y = round(self.position.y)
+
+        
 
     def draw_word(self, surface, font, prefix_length=0):
         """Render ``self.word`` horizontally centered above the sprite.
@@ -160,3 +164,52 @@ class Alien(pygame.sprite.Sprite):
         )
         surface.blit(prefix_surf, prefix_rect)
         surface.blit(suffix_surf, suffix_rect)
+
+class KillLaser(pygame.sprite.Sprite):
+    """A vertical beam that shoots up from the bottom of the screen to destroy an alien."""
+    def __init__(self, target_alien):
+        """
+        Create a laser aimed at the given alien.
+        Args:
+            target_alien (Alien): The alien this laser is targeting. The
+                laser will destroy itself when it collides with the
+                alien or passes its center y.
+        """
+        super().__init__()
+        # Create a simple vertical beam
+        self.image = pygame.Surface((4, 20))
+        self.image.fill(ColorSettings.COLORS['WHITE'])
+        
+        # Start at the bottom of the screen, aligned with the alien
+        self.rect = self.image.get_rect(midbottom=(target_alien.rect.centerx, ScreenSettings.HEIGHT))
+        
+        self.target = target_alien
+        self.speed = -8 # Moves UP
+
+class KillLaser(pygame.sprite.Sprite):
+    def __init__(self, target_alien):
+        super().__init__()
+        # Use the dimensions and color from your legacy settings
+        self.image = pygame.Surface((4, 20)) 
+        self.image.fill((0, 255, 255)) # Cyan/Aqua color
+        
+        # Start at the bottom, locked to the target's X
+        self.rect = self.image.get_rect(midbottom=(target_alien.rect.centerx, ScreenSettings.HEIGHT))
+        
+        self.target = target_alien
+        self.speed = -10 # Consistent speed
+
+    def update(self):
+        self.rect.y += self.speed
+        
+        # Check for contact:
+        # We check BOTH a collision and if the laser has passed the alien's center.
+        # This prevents the laser from "teleporting" past the alien at high speeds.
+        if self.rect.colliderect(self.target.rect) or self.rect.top <= self.target.rect.centery:
+            print("Impact!") # This will now trigger
+            self.target.kill() # Remove the alien
+            self.kill()        # Remove the laser
+        
+        # Safety cleanup if it misses
+        elif self.rect.bottom < 0:
+            self.kill()

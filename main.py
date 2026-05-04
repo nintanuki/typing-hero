@@ -33,6 +33,7 @@ import sys
 
 import pygame
 
+from core.sprites import KillLaser
 from settings import (
     FontSettings,
     HeartSettings,
@@ -62,6 +63,7 @@ def run() -> None:
     # test ("aliens appear at the top every couple seconds") sees an
     # alien within the first frame instead of after the first interval.
     aliens = pygame.sprite.Group()
+    lasers = pygame.sprite.Group()
 
     # Fonts are loaded once and passed into render paths so we never
     # call pygame.font.Font(...) inside the per-frame loop. The word
@@ -159,7 +161,16 @@ def run() -> None:
                             # footgun where the two clocks could fight.
                             scores.add_for_color(killed.color)
                             spawn_director.adjust_difficulty(scores.score)
-                            killed.kill()
+
+                            # Create laser targeting the alien
+                            new_laser = KillLaser(killed)
+                            lasers.add(new_laser)
+
+                            # Mark the alien so it doesn't cause damage or take more input
+                            # (We don't kill it yet; the laser will do that)
+                            killed.is_dying = True
+
+                            # killed.kill()
                             print("kill")
                     elif event.key == pygame.K_BACKSPACE:
                         word_manager.handle_backspace()
@@ -216,6 +227,8 @@ def run() -> None:
             # rendered fully off-screen.
             aliens.update()
 
+            lasers.update()
+
             # Stage 5: miss detection. Iterate a snapshot of the group
             # (``list(aliens)``) because alien.kill() mutates the group
             # mid-iteration. ``rect.top > HEIGHT`` is the "fully past
@@ -260,6 +273,7 @@ def run() -> None:
 
         screen.fill(ScreenSettings.BG_COLOR)
         aliens.draw(screen)
+        lasers.draw(screen)
         for alien in aliens:
             # Only the targeted alien gets a non-zero prefix_length;
             # every other alien renders its whole word in
