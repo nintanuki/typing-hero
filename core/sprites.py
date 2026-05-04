@@ -168,13 +168,14 @@ class Alien(pygame.sprite.Sprite):
 
 class KillLaser(pygame.sprite.Sprite):
     """A vertical beam that shoots up from the bottom of the screen to destroy an alien."""
-    def __init__(self, target_alien, explosion_group):
+    def __init__(self, target_alien, explosion_group, audio):
         """
         Create a laser aimed at the given alien.
         Args:
             target_alien (Alien): The alien this laser is targeting. The
                 laser will destroy itself when it collides with the
                 alien or passes its center y.
+            audio: Audio object to play sound effects.
         """
         super().__init__()
         # Create a simple vertical beam.
@@ -187,11 +188,11 @@ class KillLaser(pygame.sprite.Sprite):
         self.target = target_alien
         self.explosion_group = explosion_group
         self.speed = -8
+        self.audio = audio
 
     def update(self):
         """Move the laser up and check for collision with the target alien."""
         self.rect.y += self.speed
-        
         # Check for contact:
         # We check BOTH a collision and if the laser has passed the alien's center.
         # This prevents the laser from "teleporting" past the alien at high speeds.
@@ -199,14 +200,11 @@ class KillLaser(pygame.sprite.Sprite):
             # CREATE: We create the actual instance right here.
             impact_explosion = Explosion(self.target.rect.centerx, self.target.rect.centery)
             self.explosion_group.add(impact_explosion)
-            # JOIN: We add it to the groups the alien already belongs to.
-            # Since the alien is in the 'aliens' group in main_3.py, 
-            # the explosion joins that same group.
-
-            print("Impact!") # This will now trigger
+            # Play explosion sound
+            if self.audio:
+                self.audio.play('explosion')
             self.target.kill() # Remove the alien
             self.kill()        # Remove the laser
-        
         # Safety cleanup if it misses
         elif self.rect.bottom < 0:
             self.kill()

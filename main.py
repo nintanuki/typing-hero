@@ -167,7 +167,10 @@ def run() -> None:
                             spawn_director.adjust_difficulty(scores.score)
 
                             # Create laser targeting the alien
-                            new_laser = KillLaser(killed, explosions)
+
+                            # Play laser sound when firing
+                            audio.play('laser')
+                            new_laser = KillLaser(killed, explosions, audio)
                             lasers.add(new_laser)
 
                             # Mark the alien so it doesn't cause damage or take more input
