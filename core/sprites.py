@@ -82,13 +82,13 @@ class Alien(pygame.sprite.Sprite):
         Returns:
             None. Mutates ``self.position`` and ``self.rect``.
         """
-        if not self.is_dying:
-            self.position.y += AlienSettings.SPEED[self.color]
-            # ``round`` (vs ``int``) keeps the rect honest at the half-
-            # pixel boundary — at SPEED=0.5 the alien drops 1 px every two
-            # frames rather than oscillating between flooring and ceiling.
-            # The same logic applies for the other colors at their floats.
-            self.rect.y = round(self.position.y)
+        # if not self.is_dying: # removed this check so aliens don't stop moving when targeted by a laser
+        self.position.y += AlienSettings.SPEED[self.color]
+        # ``round`` (vs ``int``) keeps the rect honest at the half-
+        # pixel boundary — at SPEED=0.5 the alien drops 1 px every two
+        # frames rather than oscillating between flooring and ceiling.
+        # The same logic applies for the other colors at their floats.
+        self.rect.y = round(self.position.y)
 
         
 
@@ -176,30 +176,18 @@ class KillLaser(pygame.sprite.Sprite):
                 alien or passes its center y.
         """
         super().__init__()
-        # Create a simple vertical beam
-        self.image = pygame.Surface((4, 20))
+        # Create a simple vertical beam.
+        self.image = pygame.Surface((4, 20)) 
         self.image.fill(ColorSettings.COLORS['WHITE'])
         
-        # Start at the bottom of the screen, aligned with the alien
+        # Start at the bottom, locked to the target's X to align with the alien
         self.rect = self.image.get_rect(midbottom=(target_alien.rect.centerx, ScreenSettings.HEIGHT))
         
         self.target = target_alien
-        self.speed = -8 # Moves UP
-
-class KillLaser(pygame.sprite.Sprite):
-    def __init__(self, target_alien):
-        super().__init__()
-        # Use the dimensions and color from your legacy settings
-        self.image = pygame.Surface((4, 20)) 
-        self.image.fill((0, 255, 255)) # Cyan/Aqua color
-        
-        # Start at the bottom, locked to the target's X
-        self.rect = self.image.get_rect(midbottom=(target_alien.rect.centerx, ScreenSettings.HEIGHT))
-        
-        self.target = target_alien
-        self.speed = -10 # Consistent speed
+        self.speed = -8
 
     def update(self):
+        """Move the laser up and check for collision with the target alien."""
         self.rect.y += self.speed
         
         # Check for contact:
