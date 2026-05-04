@@ -1,1 +1,1 @@
-{"high_score": 3100, "leaderboard": []}
+{"high_score": 4100, "leaderboard": []}

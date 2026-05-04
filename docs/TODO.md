@@ -311,12 +311,7 @@ Each stage is small enough to finish, run, and *see something change* in one sit
 
 **Tuning checkpoint.** Play it. Are misses too punishing? Adjust alien speed and spawn rate before moving on. (Q5.) Time-to-miss is currently ~12 s per alien at `AlienSettings.SPEED = 0.5`; with 3 hearts that's a generous window before the run ends. If it feels too long (run never ends in practice), bump SPEED first, then SPAWN_RATE down. If it feels too short (every miss compounds before you can read the next word), lower SPEED to 0.4.
 
-### Stage 7 — Score + simple difficulty ramp (SOME CREATIVE DECISIONS HAVE BEEN MADE AHEAD OF THIS THAT WERE NOT ADDED TO THE CHANGELOG, SUCH AS ADDING THE LASER, ALIEN NO LONGER STOPS MOVING WHEN TARGETED, EXPLOSION AND BACKGROUND 
-
-
-
-
-
+### Stage 7 — Score + simple difficulty ramp (SOME CREATIVE DECISIONS HAVE BEEN MADE AHEAD OF THIS STAGE THAT WERE NOT ADDED TO THE CHANGELOG, SUCH AS ADDING THE LASER, ALIEN NO LONGER STOPS MOVING WHEN TARGETED, EXPLOSION AND BACKGROUND ANIMATION, ETC. PLEASE ADAPT AND REFACTOR AS NECESSARY)
 
 ANIMATIONS, SOUND EFFECTS, ETC. CHECK THE CODE FIRST AND ADAPT! IT MIGHT HAVE BEEN MESSY SO REFACTOR IF NECESSARY BUT KEEP FUNCTIONALITY)
 **Goal:** Word kills award points (varied by alien color). Score visible top-left. Per-color fall speed lands so the four colors carry distinct motion identity. Spawn rate ramps down as score climbs.

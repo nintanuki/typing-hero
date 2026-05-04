@@ -1,10 +1,4 @@
-"""Project-wide tunable constants for Typing Hero.
-
-This file is intentionally minimal at Stage 0 — it carries only the constants
-needed to open a window and locate bundled assets. Game-mechanic constants
-(typing rules, alien speeds, scoring) will be added in later stages as the
-features that need them land.
-"""
+"""Project-wide constants for Typing Hero."""
 
 import os
 
@@ -30,16 +24,13 @@ class ScreenSettings:
     HEIGHT = 800
     RESOLUTION = (WIDTH, HEIGHT)
     CENTER = (WIDTH / 2, HEIGHT / 2)
-    FPS = 120 # Do we want to keep it at 120? Or should we drop to 60?
-    # Stage 0 fills the screen with a solid black each frame; once the
-    # scrolling background ports over (Stage 8 polish), this constant becomes
-    # a fallback that is never actually visible.
+    FPS = 120
     BG_COLOR = ColorSettings.COLORS['BLACK']
     CRT_ALPHA_RANGE = (75, 90)
-    CRT_SCANLINE_HEIGHT = 3 # vertical pixels between scanlines drawn on the CRT overlay
+    CRT_SCANLINE_HEIGHT = 3
     DEFAULT_BG_SCROLL_SPEED = 50
-    BG_SCROLL_STEP = 25 # how many pixels the background moves each difficulty step (lower = smoother, higher = more noticeable)
-    BG_SCROLL_MAX = 500 # maximum scroll speed for the background, to prevent it from becoming too fast at high scores
+    BG_SCROLL_STEP = 25
+    BG_SCROLL_MAX = 500
     TITLE = "Typing Hero"
 
 
@@ -58,30 +49,13 @@ class AudioSettings:
 
     DEFAULT_MASTER_VOLUME = 0.5
     DEBUG_MUTE = False  # set True to silence all audio for debugging
-    BASE_DIR = os.path.dirname(__file__)
-    ASSETS_DIR = os.path.join(BASE_DIR, 'assets')
-    MUSIC_DIR = os.path.join(ASSETS_DIR, 'music')
-    AUDIO_DIR = os.path.join(ASSETS_DIR, 'audio')
-
-
-class AudioSettings:
-    """
-    Defines settings related to audio in the game,
-    including the volume boost applied during the intro sequence
-    and the default master volume level for all sounds.
-    """
     INTRO_VOL_BOOST = 2.0
-    DEFAULT_MASTER_VOLUME = 0.5 # default value is 1.0
-    DEBUG_MUTE = False # set True to silence all audio for debugging
-    # All bundled media now lives under a single assets/ folder
-    # (assets/audio, assets/font, assets/graphics, assets/music) so the
-    # project root only carries code + docs + saves.
     BASE_DIR = os.path.dirname(__file__)
     ASSETS_DIR = os.path.join(BASE_DIR, 'assets')
     MUSIC_DIR = os.path.join(ASSETS_DIR, 'music')
     AUDIO_DIR = os.path.join(ASSETS_DIR, 'audio')
     BGM_PLAYLIST = [
-        'star_hero.ogg'
+        'star_hero.ogg',
     ]
 
 class AssetPaths:
@@ -97,137 +71,38 @@ class AssetPaths:
     HEART = os.path.join(GRAPHICS_DIR, 'heart.png')
     TV = os.path.join(GRAPHICS_DIR, 'tv.png')
 
-    # # Sounds
-    # AUDIO_DIR = os.path.join(ASSETS_DIR, 'audio')
-    # LASER = os.path.join(AUDIO_DIR, 'laser.ogg')
-    # HYPER = os.path.join(AUDIO_DIR, 'hyper.ogg')
-    # EXPLOSION = os.path.join(AUDIO_DIR, 'explosion.ogg')
-    # UFO = os.path.join(AUDIO_DIR, 'ufo.ogg')
-    # PAUSE = os.path.join(AUDIO_DIR, 'sfx_sounds_pause2_in.ogg')
-    # UNPAUSE = os.path.join(AUDIO_DIR, 'sfx_sounds_pause2_out.ogg')
-
-    # # Music
-    # MUSIC_DIR = os.path.join(ASSETS_DIR, 'music')
-    # INTRO_MUSIC = os.path.join(MUSIC_DIR, 'star_hero_intro.ogg')
-    # PLAYER_DOWN = os.path.join(MUSIC_DIR, 'game_over.ogg')
-    # BGM_PLAYLIST = [
-    #     os.path.join(MUSIC_DIR, 'star_hero.ogg'),
-    # ]
 
 class WordSettings:
     """Tunables for rendering the word floating above each alien."""
 
-    # Font size used when rasterizing alien words. MEDIUM keeps short
-    # 4-6 letter words readable without crowding the sprite; revisit if
-    # Stage 6+ tuning makes longer words common.
     SIZE = FontSettings.MEDIUM
-    # Color used for the untyped portion of an alien's word (i.e. the
-    # whole word when no target is locked, or the suffix that has not
-    # been typed yet on the targeted alien). Renamed concept arrives in
-    # Stage 3 alongside PREFIX_COLOR — the plain ``COLOR`` name is kept
-    # so Stage 1/2 call sites that pass no prefix still read naturally.
     COLOR = ColorSettings.COLORS['WHITE']
-    # Color used for the already-typed prefix on the targeted alien's
-    # word (Stage 3). Cyan reads as "active / electric" against the
-    # untyped white suffix and is distinguishable on the red/green/
-    # yellow/blue alien sprites without clashing with any of them.
     PREFIX_COLOR = ColorSettings.COLORS['CYAN']
-    # Pixel gap between the word's baseline and the alien sprite's top
-    # edge. Big enough that the word never visually merges with the
-    # sprite, small enough that it still reads as "this word belongs to
-    # this alien" at typical spawn density.
     OFFSET_ABOVE_SPRITE = 12
-    # Path to the on-disk word list ``WordManager`` loads at boot
-    # (Stage 4). Stored lowercase per Q7 — the renderer and the
-    # comparator both uppercase at use. Kept under ``assets/`` so
-    # editing the word list doesn't require touching code, and so the
-    # "everything bundled" layout from ``docs/TODO.md`` Stage 0 holds.
     WORDLIST_PATH = os.path.join(
         os.path.dirname(__file__), 'assets', 'words.txt'
     )
 
 
 class SpawnSettings:
-    """Tunables for the Stage 4 alien spawner.
+    """Tunables for alien spawning."""
 
-    ``SpawnDirector`` reads these to drive the single pygame timer
-    event that pushes new aliens onto the screen. Difficulty scaling
-    (shrinking ``SPAWN_RATE`` as score climbs) is a Stage 7 concern;
-    Stage 4 keeps the rate constant.
-    """
-
-    # Milliseconds between alien spawns. Star Hero's legacy default of
-    # 600 ms is brutal for a typing game (``docs/TODO.md`` §6 pitfall
-    # "The legacy alien spawn rate is way too fast for typing");
-    # 3000 ms gives the player real time to read the next word and
-    # commit to a target before the screen fills. Tune downward in
-    # Stage 5 once aliens fall and a "miss" actually costs something.
-    SPAWN_RATE = 3000
-    # Vertical center y of newly-spawned aliens. Stage 4 aliens don't
-    # move (Stage 5 ports falling), so the spawn y has to leave the
-    # alien sprite *and* the word floating above it both fully on
-    # screen. With WordSettings.OFFSET_ABOVE_SPRITE=12 and a MEDIUM
-    # font, y=80 keeps the word baseline around y=52 — clear of the
-    # screen top with a small breathing margin. Once Stage 5 lands,
-    # this becomes a negative y so aliens fall *into* the screen.
+    SPAWN_RATE = 3000  # ms between spawns
     SPAWN_Y = 80
-    # Horizontal margin from each screen edge so the word floating
-    # above an alien doesn't clip the screen when the sprite spawns
-    # near a wall. Sized for the longest words in ``assets/words.txt``
-    # (e.g. "thunder", "crystal") rendered at WordSettings.SIZE — a
-    # ~140 px word centered on x needs ~70 px of breathing room each
-    # side; 80 keeps a small buffer. Revisit if longer words land in
-    # Stage 6+ tuning.
-    X_MARGIN = 80
-    # Alien colors the spawner picks from. Stage 4 picks uniformly —
-    # color-keyed difficulty bands and per-color point values are a
-    # Stage 7+ concern (``docs/TODO.md`` Q6). All four sprite colors
-    # exist in ``assets/graphics/`` already so any of them is fair
-    # game from the spawner's perspective.
+    X_MARGIN = 80  # keep words from clipping screen edges
     COLORS = ('red', 'green', 'yellow', 'blue')
 
 
 class AlienSettings:
-    """Tunables for alien behavior once on screen (Stage 5+).
+    """Per-color speed and point values. Red is slowest/cheapest; blue is fastest/most valuable."""
 
-    Stage 5 introduced uniform vertical descent. Stage 7 promotes
-    ``SPEED`` to a per-color dict and adds ``POINTS`` so the four
-    colors carry distinct difficulty + reward identity (Q6 +
-    ``docs/TODO.md`` §8 O1: "be faithful to how Star Hero felt"). The
-    yellow zigzag motion and the blue confusion stall are still
-    forever-cut (§2) — only the *speed* axis lands here. Drop-table
-    chances and the confusion-attack tunable block remain cut.
-    """
-
-    # Per-color pixels-per-frame an alien drops. Mirrors the legacy
-    # ``AlienSettings.SPEED`` shape (red slow → blue fast) but the
-    # numbers are scaled down for typing pace: legacy values were
-    # tuned for a 60-FPS shooter where you dodge bullets, not type
-    # words. At 120 FPS:
-    #   * red = 0.5  → ~12 s top-to-bottom (was 1 px/frame at 60 FPS)
-    #   * green = 0.7 → ~8.6 s
-    #   * yellow = 0.9 → ~6.7 s
-    #   * blue = 1.1 → ~5.5 s
-    # The 5.5 s window for blue assumes the player sees and starts
-    # typing immediately — for a 6-letter word that's ~1 second to
-    # read + ~4.5 s to type at ~80 WPM, so it stays catchable. Tune
-    # at Stage 7's smoke-test checkpoint if blue feels unfair.
-    # Stored as floats so ``Alien.position``'s Vector2 accumulator
-    # advances honestly at sub-pixel SPEED — the same reason Stage 5
-    # used a float for the uniform value.
+    # px/frame at 120 FPS: red ~12 s, green ~8.6 s, yellow ~6.7 s, blue ~5.5 s top-to-bottom
     SPEED = {
         'red':    0.5,
         'green':  0.7,
         'yellow': 0.9,
         'blue':   1.1,
     }
-    # Per-color point values awarded on a successful kill. Same shape
-    # as legacy ``AlienSettings.POINTS`` — harder-color = more points,
-    # so the difficulty/reward contract from Q6 reads correctly:
-    # blue is fastest *and* worth the most. Values mirror legacy
-    # exactly for "be faithful" (§8 O1). ``ScoreManager.add_for_color``
-    # is the single read path so a future tuning pass changes one
-    # constant.
     POINTS = {
         'red':    100,
         'green':  200,
@@ -235,141 +110,56 @@ class AlienSettings:
         'blue':   500,
     }
 
+
 class ExplosionSettings:
-    """
-    Contains all the settings related to explosion animations,
-    including the number of frames in the sprite sheet, animation speed,
-    size of each frame, and scale for rendering.
-    """
-    FRAMES = 7 # there are seven unique images in the explosion sprite sheet
-    ANIMATION_SPEED = 0.15 # smaller numbers = slower explosion animation. Always 0.x
-    SIZE = 192 # size of each frame in the spritesheet, definse both width and height
+    """Explosion sprite sheet tunables."""
+
+    FRAMES = 7
+    ANIMATION_SPEED = 0.15  # smaller = slower
+    SIZE = 192
     SCALE = 0.5
 
+
 class TypingSettings:
-    """Tunables for capturing player typing and rendering the typing buffer.
+    """Typing buffer capture and rendering tunables. All on-screen text renders uppercase."""
 
-    Project-wide rule (see ``docs/TODO.md`` Q7): all in-game text renders
-    in UPPERCASE. The typing buffer follows that rule too, regardless of
-    the actual key-case the player presses.
-    """
-
-    # Font size for the bottom-of-screen typing buffer. LARGE gives the
-    # player's typed letters more visual weight than the per-alien word
-    # labels, so the buffer reads as a HUD element rather than another
-    # alien's tag.
     SIZE = FontSettings.LARGE
     COLOR = ColorSettings.COLORS['WHITE']
-    # Vertical distance between the typing buffer's baseline and the
-    # bottom edge of the screen. Big enough that descenders / pixel
-    # artifacts in Pixeled don't kiss the screen edge, small enough
-    # that the buffer doesn't drift up into the playfield.
     OFFSET_FROM_BOTTOM = 24
-    # Maximum buffer length. Words land well under this in v1; the cap
-    # exists so a stray keyboard repeat or paste doesn't grow the
-    # rendered surface unbounded across the screen.
-    MAX_LENGTH = 32
+    MAX_LENGTH = 32  # guard against keyboard-repeat / paste flooding the buffer
 
 
 class HeartSettings:
-    """Tunables for the player-health HUD ported in Stage 6.
+    """Player-health HUD tunables."""
 
-    Carries the hearts-row geometry from the legacy ``UISettings`` block
-    (``HEART_TOP_MARGIN``, ``HEART_RIGHT_MARGIN``, ``HEART_SPACING``) and
-    adds ``MAX`` for the starting heart count. The legacy class also held
-    boost-meter / status-row / bombs-row constants — those are forever-
-    cut per ``docs/TODO.md`` §2 and don't make the trip.
-    """
-
-    # Starting (and maximum) hearts. Q5 resolved as "3 hearts × 1 miss
-    # each" paired with the slow ``AlienSettings.SPEED`` that gives a
-    # ~12 s window per alien — three misses worth of slow descent reads
-    # as forgiving without removing the threat. Stage 6's tuning
-    # checkpoint revisits if play-testing says otherwise.
     MAX = 3
-    # Pixels between the top of the screen and the top of the heart
-    # icons. Matches legacy ``UISettings.HEART_TOP_MARGIN`` so the row
-    # sits in the same visual slot players who knew Star Hero are used
-    # to (and so the asset still reads as "hearts" without re-tuning).
     TOP_MARGIN = 8
-    # Pixels between the rightmost heart and the screen's right edge.
-    # Matches legacy ``UISettings.HEART_RIGHT_MARGIN``.
     RIGHT_MARGIN = 30
-    # Pixels between adjacent hearts in the row. Matches legacy
-    # ``UISettings.HEART_SPACING``.
     SPACING = 10
 
 
 class GameOverSettings:
-    """Tunables for the minimal Stage 6 game-over overlay.
+    """Game-over overlay text and layout."""
 
-    Stage 6 only needs the banner + a "press Enter to restart" prompt so
-    the run-loop can close. The richer game-over screen (final score,
-    high-score, initials entry) lands in Stage 9 alongside the intro
-    screen and the ``SessionStateManager`` port — at which point this
-    class likely gets folded into a broader ``MenuSettings``.
-    """
-
-    # Banner text + size. LARGE matches the legacy game-over banner and
-    # reads as the dominant element of the screen at this font.
     BANNER_TEXT = "GAME OVER"
     BANNER_SIZE = FontSettings.LARGE
-    # Restart-prompt text + size. MEDIUM is a step down from BANNER so
-    # the banner stays the heading and the prompt reads as instruction.
     PROMPT_TEXT = "PRESS ENTER TO RESTART"
     PROMPT_SIZE = FontSettings.MEDIUM
     COLOR = ColorSettings.COLORS['WHITE']
-    # Pixels the banner sits *above* screen center, and the prompt sits
-    # *below*. Centering both around CENTER (rather than stacking from
-    # the top) keeps the overlay vertically balanced so the eye lands
-    # on the banner first and the prompt second without scanning the
-    # whole screen.
-    BANNER_OFFSET = 40
-    PROMPT_OFFSET = 30
+    BANNER_OFFSET = 40   # px above screen center
+    PROMPT_OFFSET = 30   # px below screen center
 
 
 class ScoreSettings:
-    """Tunables for the Stage 7 score system + difficulty ramp.
+    """Run-score, difficulty ramp, and HUD layout tunables."""
 
-    Carries the run-score numbers (``DIFFICULTY_STEP``,
-    ``SPAWN_RATE_DROP``, ``MIN_SPAWN_RATE``), the on-disk save filename,
-    and the top-left HUD geometry. Mirrors legacy ``AlienSettings``
-    values where they apply — see ``docs/TODO.md`` §8 O1 ("be
-    faithful") — but lives in its own class so score concerns aren't
-    tangled with alien behavior.
-    """
-
-    # Filename for the persisted high-score / leaderboard payload.
-    # Same name as legacy so a Star Hero install's save file lands
-    # cleanly in a Typing Hero install and the high-score row reads
-    # populated from the first boot. Anchored at ``BASE_DIR`` (not
-    # ``__file__``) so the save sits at the project root rather than
-    # inside settings/, matching the legacy layout.
     SAVE_FILENAME = 'high_score.txt'
     SAVE_PATH = os.path.join(os.path.dirname(__file__), SAVE_FILENAME)
 
-    # Score thresholds for the difficulty ramp. Every full
-    # DIFFICULTY_STEP points the player earns, ``SpawnDirector``
-    # tightens the spawn interval by SPAWN_RATE_DROP milliseconds,
-    # clamped at MIN_SPAWN_RATE. Legacy used 5000-point steps; we
-    # keep that here because the per-color POINTS values port from
-    # legacy too, so a step-per-roughly-25-kills cadence reads the
-    # same. Re-tune at the Stage 7 smoke-test checkpoint if the
-    # ramp feels too steep or too gentle.
-    DIFFICULTY_STEP = 5000
-    # 200 ms per step is twice the legacy 25 ms because we start at
-    # 3000 ms (vs legacy 600 ms) — proportionally similar drop.
-    SPAWN_RATE_DROP = 200
-    # MIN_SPAWN_RATE is well above legacy's 150 ms because typing
-    # below ~1 word per second is brutal regardless of skill. 1200
-    # ms still gives 9 step levels (3000 → 1200) which is plenty of
-    # difficulty headroom for a v1.
-    MIN_SPAWN_RATE = 1200
+    DIFFICULTY_STEP = 5000    # points between ramp steps
+    SPAWN_RATE_DROP = 200     # ms removed per step
+    MIN_SPAWN_RATE = 1200     # ms floor (9 steps from 3000 ms)
 
-    # Top-left HUD geometry. Mirrors legacy ``display_in_game_score``
-    # in ``legacy/ui/style.py`` — small high-score row at (10, 5),
-    # medium current-score row at (10, 20). The two-row stack is part
-    # of the "be faithful to scoreboard" piece of §8 O1.
     HIGH_SCORE_TOPLEFT = (10, 5)
     SCORE_TOPLEFT = (10, 20)
     HIGH_SCORE_SIZE = FontSettings.SMALL
