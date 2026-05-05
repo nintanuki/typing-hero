@@ -1376,3 +1376,54 @@ Stage 7 of the build plan in `docs/TODO.md` lands. Word kills now award points (
      corrupt save file boots cleanly with HIGH SCORE = 0.]
 **Why:** Same pattern as previous stages — flip "(not yet built)" to ✅ and harden hedged checks into specific, regression-able ones. Four new bullets the pre-stage version didn't have: the per-color POINTS values bullet (regression hook for the POINTS dict — easy to break by typo'ing a color or swapping two values), the visible-speed-differentiation bullet (regression hook for the per-color SPEED dict — same risk), the restart-re-arms-spawn-timer bullet (regression hook for the explicit `adjust_difficulty(0)` call in the restart branch — without it the new run inherits the old ramp), and the corrupt-save bullet (regression hook for the `_load_from_disk` try/except — without it a single bad save would brick startup).
 **Editor:** Claude Opus 4.7 via Cowork
+
+## 2026-05-05 00:00 UTC — Reintroduce red/green powerups (typing flow)
+
+Powerups are now back in the Typing Hero branch in a minimal scope: red aliens can drop heart tokens and green aliens can drop laser-upgrade tokens. Powerups fall down the screen and trigger when they reach the bottom edge. Hearts restore one heart (with the legacy heart SFX), and green upgrades now follow a two-step progression: single -> twin -> burst. Burst uses the `hyper` SFX and can hit enemies in a vertical line.
+
+**File:** settings.py
+**Date and Time:** 2026-05-05 00:00 UTC
+**Lines (at time of edit):** AlienSettings + new PowerupSettings class (modified)
+**Before:**
+    class AlienSettings:
+        SPEED = {...}
+        POINTS = {...}
+**After:**
+    class AlienSettings:
+        SPEED = {...}
+        POINTS = {...}
+        DROP_CHANCE = {'red': 0.20, 'green': 0.20}
+
+    class PowerupSettings:
+        SPEED = 2
+        RADIUS = 12
+        HEART_TYPE = 'heal'
+        LASER_UPGRADE_TYPE = 'laser_upgrade'
+        MAX_LASER_LEVEL = 3
+**Why:** Centralize all tunables for the new drop/effect loop and keep progression constants out of `main.py`.
+**Editor:** GPT-5.3-Codex via Copilot
+
+**File:** core/sprites.py
+**Date and Time:** 2026-05-05 00:00 UTC
+**Lines (at time of edit):** appended PowerUp class (modified)
+**Before:**
+    [Alien and KillLaser only]
+**After:**
+    [Added PowerUp sprite class with two visuals: heart image token and
+     green diamond token, downward motion in update(), and
+     reached_bottom() trigger helper.]
+**Why:** Bring back visible falling drops using existing assets and keep drawing/motion behavior inside sprite classes.
+**Editor:** GPT-5.3-Codex via Copilot
+
+**File:** main.py
+**Date and Time:** 2026-05-05 00:00 UTC
+**Lines (at time of edit):** event/update/draw loop + new helper functions (modified)
+**Before:**
+    [No powerup group, no drop roll, single-target laser behavior only.]
+**After:**
+    [Added `powerups` sprite group, drop rolls on alien kill, bottom-edge
+     powerup resolution, laser-level state, and three shot resolvers:
+     single (target only), twin (target + side-beam candidates), burst
+     (all enemies intersecting target x-line).]
+**Why:** Implement requested behavior with minimal architecture change: preserve current typing lock loop while adding reintroduced reward/upgrade mechanics.
+**Editor:** GPT-5.3-Codex via Copilot

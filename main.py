@@ -1,14 +1,17 @@
 """Typing Hero — main entry point."""
 
+import random
 import sys
 
 import pygame
 
 from core.animations import Background
-from core.sprites import KillLaser
+from core.sprites import KillLaser, PowerUp
 from settings import (
+    AlienSettings,
     FontSettings,
     HeartSettings,
+    PowerupSettings,
     ScreenSettings,
     TypingSettings,
     WordSettings,
@@ -35,6 +38,7 @@ def run() -> None:
     aliens = pygame.sprite.Group()
     lasers = pygame.sprite.Group()
     explosions = pygame.sprite.Group()
+    powerups = pygame.sprite.Group()
 
     word_font = pygame.font.Font(FontSettings.FONT, WordSettings.SIZE)
     typing_font = pygame.font.Font(FontSettings.FONT, TypingSettings.SIZE)
@@ -53,6 +57,7 @@ def run() -> None:
     scores = ScoreManager()
 
     hearts = HeartSettings.MAX
+    laser_level = 1
 
     # state: 'intro' | 'playing' | 'paused' | 'game_over'
     state = 'intro'
@@ -75,9 +80,10 @@ def run() -> None:
                 elif state == 'intro':
                     if event.key == pygame.K_RETURN:
                         _start_game(
-                            aliens, word_manager, spawn_director, audio, bg_group
+                            aliens, word_manager, spawn_director, audio, bg_group, powerups
                         )
                         hearts = HeartSettings.MAX
+                        laser_level = 1
                         state = 'playing'
 
                 elif state == 'playing':
@@ -98,14 +104,18 @@ def run() -> None:
                                 and word_manager.current_prefix
                                 == word_manager.targeted_alien.word.upper()
                             ):
-                                _try_fire_laser(
+                                hearts, laser_level = _resolve_shot_outcome(
                                     word_manager,
                                     scores,
                                     spawn_director,
                                     audio,
+                                    aliens,
                                     lasers,
                                     explosions,
+                                    powerups,
                                     bg_group,
+                                    hearts,
+                                    laser_level,
                                 )
 
                 elif state == 'paused':
@@ -129,10 +139,11 @@ def run() -> None:
                     else:
                         if event.key == pygame.K_RETURN:
                             _restart_game(
-                                aliens, lasers, explosions,
+                                aliens, lasers, explosions, powerups,
                                 word_manager, spawn_director, scores, audio, bg_group
                             )
                             hearts = HeartSettings.MAX
+                            laser_level = 1
                             state = 'playing'
 
             elif event.type == spawn_director.spawn_event:
@@ -150,6 +161,11 @@ def run() -> None:
             aliens.update()
             lasers.update()
             explosions.update()
+            powerups.update()
+
+            hearts, laser_level = _resolve_powerups_at_bottom(
+                powerups, hearts, laser_level, audio
+            )
 
             for alien in list(aliens):
                 if alien.rect.top > ScreenSettings.HEIGHT:
@@ -181,6 +197,7 @@ def run() -> None:
             aliens.draw(screen)
             lasers.draw(screen)
             explosions.draw(screen)
+            powerups.draw(screen)
             for alien in aliens:
                 if alien is word_manager.targeted_alien:
                     alien.draw_word(screen, word_font, word_manager.prefix_length)
@@ -217,12 +234,13 @@ def run() -> None:
     pygame.quit()
 
 
-def _start_game(aliens, word_manager, spawn_director, audio, bg_group):
+def _start_game(aliens, word_manager, spawn_director, audio, bg_group, powerups):
     """Transition from intro to playing: stop intro music, start BGM, first spawn."""
     audio.stop_intro_music()
     audio.stop_bgm()
     audio.stop_alarms()
     audio.ensure_bgm_playing()
+    powerups.empty()
     spawn_director.adjust_difficulty(0)
     spawn_director.sync_background_speed(bg_group, 0)
     spawn_director.spawn(aliens, word_manager, 0)
@@ -233,25 +251,134 @@ def _handle_spacebar_playing():
     pass
 
 
-def _try_fire_laser(word_manager, scores, spawn_director, audio, lasers, explosions, bg_group):
-    """Attempt to fire and resolve a completed locked word."""
-    killed = word_manager.handle_enter()
-    if killed is None:
-        return
-    scores.add_for_color(killed.color)
+def _resolve_shot_outcome(
+    word_manager,
+    scores,
+    spawn_director,
+    audio,
+    aliens,
+    lasers,
+    explosions,
+    powerups,
+    bg_group,
+    hearts,
+    laser_level,
+):
+    """Resolve one completed word into kills, drops, and shot visuals."""
+    targeted_alien = word_manager.handle_enter()
+    if targeted_alien is None:
+        return hearts, laser_level
+
+    victims = _resolve_shot_targets(targeted_alien, aliens, laser_level)
+    if not victims:
+        return hearts, laser_level
+
+    for victim in victims:
+        if victim.is_dying:
+            continue
+        scores.add_for_color(victim.color)
+        _try_spawn_powerup_drop(victim, powerups, hearts, laser_level)
+        victim.is_dying = True
+        lasers.add(KillLaser(victim, explosions, audio))
+
     spawn_director.adjust_difficulty(scores.score)
     spawn_director.sync_background_speed(bg_group, scores.score)
-    audio.play('laser')
-    lasers.add(KillLaser(killed, explosions, audio))
-    killed.is_dying = True
+    if laser_level >= PowerupSettings.MAX_LASER_LEVEL:
+        audio.play('hyper')
+    else:
+        audio.play('laser')
+    return hearts, laser_level
 
 
-def _restart_game(aliens, lasers, explosions, word_manager, spawn_director, scores, audio, bg_group):
+def _resolve_shot_targets(targeted_alien, aliens, laser_level):
+    """Return aliens hit by the current laser mode for one successful word."""
+    if targeted_alien not in aliens:
+        return []
+
+    if laser_level <= 1:
+        return [targeted_alien]
+
+    if laser_level == 2:
+        victims = [targeted_alien]
+        beam_offsets = (-18, 18)
+        for offset in beam_offsets:
+            beam_x = targeted_alien.rect.centerx + offset
+            beam_targets = [
+                alien
+                for alien in aliens
+                if alien not in victims and alien.rect.left <= beam_x <= alien.rect.right
+            ]
+            if not beam_targets:
+                continue
+            beam_targets.sort(key=lambda alien: alien.rect.centery, reverse=True)
+            victims.append(beam_targets[0])
+        return victims
+
+    beam_x = targeted_alien.rect.centerx
+    victims = [
+        alien for alien in aliens
+        if alien.rect.left <= beam_x <= alien.rect.right
+    ]
+    victims.sort(key=lambda alien: alien.rect.centery, reverse=True)
+    return victims
+
+
+def _try_spawn_powerup_drop(alien, powerups, hearts, laser_level):
+    """Roll minimal drop table: red hearts and green laser-upgrade tokens."""
+    if alien.color == 'red':
+        if hearts >= HeartSettings.MAX:
+            return
+        if random.random() < AlienSettings.DROP_CHANCE['red']:
+            powerups.add(PowerUp(alien.rect.center, PowerupSettings.HEART_TYPE))
+        return
+
+    if alien.color == 'green':
+        if laser_level >= PowerupSettings.MAX_LASER_LEVEL:
+            return
+        if random.random() < AlienSettings.DROP_CHANCE['green']:
+            powerups.add(PowerUp(alien.rect.center, PowerupSettings.LASER_UPGRADE_TYPE))
+
+
+def _resolve_powerups_at_bottom(powerups, hearts, laser_level, audio):
+    """Apply powerup effects once drops reach the bottom edge."""
+    for powerup in list(powerups):
+        if not powerup.reached_bottom():
+            continue
+
+        if powerup.kind == PowerupSettings.HEART_TYPE:
+            if hearts < HeartSettings.MAX:
+                hearts += 1
+                audio.play('powerup_heart')
+        elif powerup.kind == PowerupSettings.LASER_UPGRADE_TYPE:
+            if laser_level < PowerupSettings.MAX_LASER_LEVEL:
+                laser_level += 1
+                if laser_level >= PowerupSettings.MAX_LASER_LEVEL:
+                    audio.play('hyper')
+                else:
+                    audio.play('powerup_twin')
+
+        powerup.kill()
+
+    return hearts, laser_level
+
+
+def _restart_game(
+    aliens,
+    lasers,
+    explosions,
+    powerups,
+    word_manager,
+    spawn_director,
+    scores,
+    audio,
+    bg_group,
+):
     """Reset all per-run state and begin a new run."""
     for alien in list(aliens):
         alien.kill()
     lasers.empty()
     explosions.empty()
+    powerups.empty()
     word_manager.clear_lock()
     scores.reset()
     audio.stop_alarms()

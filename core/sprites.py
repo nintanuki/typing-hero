@@ -5,7 +5,14 @@ import os
 import pygame
 
 from core.animations import Explosion
-from settings import AlienSettings, AssetPaths, ColorSettings, ScreenSettings, WordSettings
+from settings import (
+    AlienSettings,
+    AssetPaths,
+    ColorSettings,
+    PowerupSettings,
+    ScreenSettings,
+    WordSettings,
+)
 
 
 class Alien(pygame.sprite.Sprite):
@@ -97,3 +104,41 @@ class KillLaser(pygame.sprite.Sprite):
             self.kill()
         elif self.rect.bottom < 0:
             self.kill()
+
+
+class PowerUp(pygame.sprite.Sprite):
+    """A falling powerup that triggers once it reaches the bottom of the screen."""
+
+    def __init__(self, pos, kind):
+        super().__init__()
+        self.kind = kind
+
+        if self.kind == PowerupSettings.HEART_TYPE:
+            self.image = pygame.image.load(AssetPaths.HEART).convert_alpha()
+            self.rect = self.image.get_rect(center=pos)
+            return
+
+        diameter = PowerupSettings.RADIUS * 2
+        self.image = pygame.Surface((diameter, diameter), pygame.SRCALPHA)
+        self._draw_green_diamond()
+        self.rect = self.image.get_rect(center=pos)
+
+    def _draw_green_diamond(self):
+        """Render the green upgrade token as a small filled diamond."""
+        radius = PowerupSettings.RADIUS
+        points = [
+            (radius, 0),
+            (radius * 2, radius),
+            (radius, radius * 2),
+            (0, radius),
+        ]
+        pygame.draw.polygon(self.image, ColorSettings.COLORS['GREEN'], points)
+        pygame.draw.polygon(self.image, ColorSettings.COLORS['WHITE'], points, width=2)
+
+    def update(self):
+        """Move down one frame at configured speed."""
+        self.rect.y += PowerupSettings.SPEED
+
+    def reached_bottom(self):
+        """Return True once the powerup has reached the bottom edge of the screen."""
+        return self.rect.top >= ScreenSettings.HEIGHT

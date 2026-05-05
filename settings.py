@@ -127,6 +127,23 @@ class AlienSettings:
         'yellow': 300,
         'blue':   500,
     }
+    DROP_CHANCE = {
+        'red': 0.20,
+        'green': 0.20,
+    }
+
+
+class PowerupSettings:
+    """Powerup drop, movement, and laser-upgrade progression tunables."""
+
+    SPEED = 2
+    RADIUS = 12
+
+    HEART_TYPE = 'heal'
+    LASER_UPGRADE_TYPE = 'laser_upgrade'
+
+    # Laser modes: 1=single, 2=twin, 3=burst.
+    MAX_LASER_LEVEL = 3
 
 
 class ExplosionSettings:
