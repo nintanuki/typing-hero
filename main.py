@@ -82,16 +82,7 @@ def run() -> None:
 
                 elif state == 'playing':
                     if event.key == pygame.K_SPACE:
-                        if word_manager.current_prefix:
-                            # Mid-word: try to fire.
-                            killed = word_manager.handle_enter()
-                            if killed is not None:
-                                scores.add_for_color(killed.color)
-                                spawn_director.adjust_difficulty(scores.score)
-                                spawn_director.sync_background_speed(bg_group, scores.score)
-                                audio.play('laser')
-                                lasers.add(KillLaser(killed, explosions, audio))
-                                killed.is_dying = True
+                        _handle_spacebar_playing()
                     elif event.key == pygame.K_RETURN:
                         # Enter toggles pause.
                         audio.play('pause')
@@ -102,6 +93,20 @@ def run() -> None:
                     elif event.unicode.isalpha():
                         if word_manager.prefix_length < TypingSettings.MAX_LENGTH:
                             word_manager.handle_letter(event.unicode, aliens)
+                            if (
+                                word_manager.targeted_alien is not None
+                                and word_manager.current_prefix
+                                == word_manager.targeted_alien.word.upper()
+                            ):
+                                _try_fire_laser(
+                                    word_manager,
+                                    scores,
+                                    spawn_director,
+                                    audio,
+                                    lasers,
+                                    explosions,
+                                    bg_group,
+                                )
 
                 elif state == 'paused':
                     if event.key == pygame.K_RETURN:
@@ -221,6 +226,24 @@ def _start_game(aliens, word_manager, spawn_director, audio, bg_group):
     spawn_director.adjust_difficulty(0)
     spawn_director.sync_background_speed(bg_group, 0)
     spawn_director.spawn(aliens, word_manager, 0)
+
+
+def _handle_spacebar_playing():
+    """Reserved hook for future in-game spacebar behavior."""
+    pass
+
+
+def _try_fire_laser(word_manager, scores, spawn_director, audio, lasers, explosions, bg_group):
+    """Attempt to fire and resolve a completed locked word."""
+    killed = word_manager.handle_enter()
+    if killed is None:
+        return
+    scores.add_for_color(killed.color)
+    spawn_director.adjust_difficulty(scores.score)
+    spawn_director.sync_background_speed(bg_group, scores.score)
+    audio.play('laser')
+    lasers.add(KillLaser(killed, explosions, audio))
+    killed.is_dying = True
 
 
 def _restart_game(aliens, lasers, explosions, word_manager, spawn_director, scores, audio, bg_group):
