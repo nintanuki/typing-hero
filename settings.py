@@ -80,8 +80,25 @@ class WordSettings:
     COLOR = ColorSettings.COLORS['WHITE']
     PREFIX_COLOR = ColorSettings.COLORS['CYAN']
     OFFSET_ABOVE_SPRITE = 12
+    WORDS_DIR = os.path.join(os.path.dirname(__file__), 'assets', 'words')
     WORDLIST_PATH = os.path.join(
         os.path.dirname(__file__), 'assets', 'words.txt'
+    )
+    # One file per difficulty band, all lowercase words on disk.
+    WORD_BANK_PATHS = {
+        1: os.path.join(WORDS_DIR, 'band1_very_easy.txt'),
+        2: os.path.join(WORDS_DIR, 'band2_easy.txt'),
+        3: os.path.join(WORDS_DIR, 'band3_medium.txt'),
+        4: os.path.join(WORDS_DIR, 'band4_hard.txt'),
+        5: os.path.join(WORDS_DIR, 'band5_very_hard.txt'),
+    }
+    # Level 1..20 -> word band index.
+    LEVEL_WORD_BAND = (
+        1, 1, 1,
+        2, 2, 2, 2,
+        3, 3, 3, 3,
+        4, 4, 4, 4,
+        5, 5, 5, 5, 5,
     )
 
 
@@ -202,10 +219,82 @@ class ScoreSettings:
     SAVE_FILENAME = 'high_score.txt'
     SAVE_PATH = os.path.join(os.path.dirname(__file__), SAVE_FILENAME)
 
-    DIFFICULTY_STEP = 2500    # points between ramp steps
     MAX_LEVEL = 20
-    SPAWN_RATE_DROP = 200     # ms removed per step
-    MIN_SPAWN_RATE = 1200     # ms floor (9 steps from 3000 ms)
+
+    # Level thresholds (Level 1 starts at 0). Index 0 == L1, index 19 == L20.
+    LEVEL_SCORE_THRESHOLDS = (
+        0,
+        500,
+        1200,
+        2200,
+        3500,
+        5000,
+        7000,
+        9500,
+        12500,
+        16000,
+        20000,
+        24500,
+        29500,
+        35000,
+        41000,
+        47500,
+        54500,
+        62000,
+        70000,
+        78500,
+    )
+
+    # Level 1..20 spawn interval table in ms.
+    SPAWN_RATE_BY_LEVEL_MS = (
+        3000,
+        2800,
+        2600,
+        2400,
+        2200,
+        2000,
+        1850,
+        1700,
+        1550,
+        1400,
+        1400,
+        1400,
+        1400,
+        1400,
+        1400,
+        1400,
+        1400,
+        1400,
+        1400,
+        1400,
+    )
+
+    # Level 1..20 scalar applied on top of per-color alien base speeds.
+    ALIEN_SPEED_MULTIPLIER_BY_LEVEL = (
+        1.00,
+        1.10,
+        1.20,
+        1.30,
+        1.40,
+        1.50,
+        1.60,
+        1.70,
+        1.80,
+        1.90,
+        1.90,
+        1.90,
+        1.90,
+        1.90,
+        1.90,
+        1.90,
+        1.90,
+        1.90,
+        1.90,
+        1.90,
+    )
+
+    # Cosmetic-only background pacing, intentionally decoupled from gameplay level.
+    BACKGROUND_SPEED_SCORE_STEP = 2500
 
     HIGH_SCORE_TOPLEFT = (10, 5)
     SCORE_TOPLEFT = (10, 20)

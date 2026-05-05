@@ -11,6 +11,8 @@ from settings import AlienSettings, AssetPaths, ColorSettings, ScreenSettings, W
 class Alien(pygame.sprite.Sprite):
     """An enemy that carries a word the player must type to destroy it."""
 
+    level_speed_multiplier = 1.0
+
     def __init__(self, color, pos, word):
         super().__init__()
         self.color = color
@@ -25,9 +27,14 @@ class Alien(pygame.sprite.Sprite):
         self.is_dying = False
 
     def update(self):
-        """Advance one frame of vertical descent at the per-color speed."""
-        self.position.y += AlienSettings.SPEED[self.color]
+        """Advance one frame of descent at color speed scaled by level multiplier."""
+        self.position.y += AlienSettings.SPEED[self.color] * self.level_speed_multiplier
         self.rect.y = round(self.position.y)
+
+    @classmethod
+    def set_level_speed_multiplier(cls, multiplier):
+        """Set shared scalar applied to all aliens' per-color base speeds."""
+        cls.level_speed_multiplier = max(0.0, float(multiplier))
 
     def draw_word(self, surface, font, prefix_length=0):
         """Render ``self.word`` centered above the sprite.

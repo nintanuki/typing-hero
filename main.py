@@ -132,7 +132,7 @@ def run() -> None:
 
             elif event.type == spawn_director.spawn_event:
                 if state == 'playing':
-                    spawn_director.spawn(aliens, word_manager)
+                    spawn_director.spawn(aliens, word_manager, scores.score)
 
         # --- Update ---
         current_level = spawn_director.level(scores.score)
@@ -220,7 +220,7 @@ def _start_game(aliens, word_manager, spawn_director, audio, bg_group):
     audio.ensure_bgm_playing()
     spawn_director.adjust_difficulty(0)
     spawn_director.sync_background_speed(bg_group, 0)
-    spawn_director.spawn(aliens, word_manager)
+    spawn_director.spawn(aliens, word_manager, 0)
 
 
 def _restart_game(aliens, lasers, explosions, word_manager, spawn_director, scores, audio, bg_group):
@@ -235,7 +235,7 @@ def _restart_game(aliens, lasers, explosions, word_manager, spawn_director, scor
     audio.stop_bgm()
     spawn_director.adjust_difficulty(0)
     spawn_director.sync_background_speed(bg_group, 0)
-    spawn_director.spawn(aliens, word_manager)
+    spawn_director.spawn(aliens, word_manager, 0)
     audio.ensure_bgm_playing()
 
 
