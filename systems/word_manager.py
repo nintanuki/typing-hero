@@ -18,35 +18,35 @@ class WordManager:
         # against alien.word.upper() without re-casing on every keystroke.
         self.current_prefix = ""
         self.targeted_alien = None
+        self.candidate_aliens = []
         self._word_bands = self._load_bands(wordlist_path)
         self._all_words = self._dedupe_words_in_order(self._word_bands)
 
     def handle_letter(self, char, aliens):
-        """Append ``char`` to the prefix, acquiring a lock if needed.
-
-        With no target: finds the lowest alien whose word starts with
-        ``char`` and locks onto it. With a target: extends the prefix
-        only if it still matches; wrong letters are ignored (lock survives).
-        """
+        """Append ``char`` if it keeps at least one matching alien candidate."""
         if len(char) != 1 or not char.isalpha():
             return
         char_upper = char.upper()
 
-        if self.targeted_alien is None:
-            self._acquire_target(char_upper, aliens)
+        candidate_prefix = self.current_prefix + char_upper
+        matches = self._matching_aliens(candidate_prefix, aliens)
+        if not matches:
             return
 
-        candidate = self.current_prefix + char_upper
-        if self.targeted_alien.word.upper().startswith(candidate):
-            self.current_prefix = candidate
+        self.current_prefix = candidate_prefix
+        self._update_candidates(matches)
 
-    def handle_backspace(self):
-        """Drop the last typed letter. Releases the lock when the prefix empties."""
+    def handle_backspace(self, aliens):
+        """Drop one typed letter and recompute candidates for the new prefix."""
         if not self.current_prefix:
             return
         self.current_prefix = self.current_prefix[:-1]
         if not self.current_prefix:
+            self.candidate_aliens = []
             self.targeted_alien = None
+            return
+
+        self._update_candidates(self._matching_aliens(self.current_prefix, aliens))
 
     def handle_enter(self):
         """Commit the current prefix.
@@ -61,12 +61,14 @@ class WordManager:
         ):
             killed = self.targeted_alien
         self.current_prefix = ""
+        self.candidate_aliens = []
         self.targeted_alien = None
         return killed
 
     def clear_lock(self):
         """Drop both prefix and target without firing. Idempotent."""
         self.current_prefix = ""
+        self.candidate_aliens = []
         self.targeted_alien = None
 
     def pick_word(self, in_use, level=1):
@@ -135,18 +137,24 @@ class WordManager:
         clamped_level = self._clamp_level(level)
         return WordSettings.LEVEL_WORD_BAND[clamped_level - 1]
 
-    def _acquire_target(self, char_upper, aliens):
-        """Lock onto the lowest on-screen alien whose word starts with ``char_upper``."""
-        candidates = [
+    @staticmethod
+    def _matching_aliens(prefix, aliens):
+        """Return all alive aliens whose word starts with ``prefix``."""
+        return [
             alien for alien in aliens
-            if alien.word.upper().startswith(char_upper)
+            if alien.word.upper().startswith(prefix)
         ]
-        if not candidates:
+
+    def _update_candidates(self, candidates):
+        """Update candidate set and choose the provisional focused alien."""
+        self.candidate_aliens = list(candidates)
+        if not self.candidate_aliens:
+            self.targeted_alien = None
             return
-        # Lowest rect.top = furthest down the screen = most urgent target.
-        candidates.sort(key=lambda a: a.rect.top, reverse=True)
-        self.targeted_alien = candidates[0]
-        self.current_prefix = char_upper
+
+        # While ambiguous, bias focus to the lowest alien (most urgent).
+        self.candidate_aliens.sort(key=lambda alien: alien.rect.top, reverse=True)
+        self.targeted_alien = self.candidate_aliens[0]
 
     @property
     def prefix_length(self):

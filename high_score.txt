@@ -1,1 +1,1 @@
-{"high_score": 44400, "leaderboard": [{"name": "ACL", "score": 44400}, {"name": "FBN", "score": 26800}]}
+{"high_score": 44400, "leaderboard": [{"name": "ACL", "score": 44400}, {"name": "AAA", "score": 29400}, {"name": "FBN", "score": 26800}]}

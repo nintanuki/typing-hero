@@ -21,8 +21,8 @@ Run the relevant section after every change. Each stage in [`TODO.md`](TODO.md) 
 
 * All previous checks still pass
 * Letter keystrokes are echoed to a debug area on screen (bottom-center, uppercase)
-* Typing the alien's word + `Enter` removes the alien and prints `kill` to the console
-* Typing a wrong word + `Enter` clears the input but leaves the alien intact
+* Typing the full word destroys the targeted alien immediately (no `Enter` required)
+* Typing a letter that would match no candidate alien is ignored (buffer does not advance)
 * `Backspace` deletes the most recent character
 * All on-screen text renders in UPPERCASE (project-wide rule, see TODO Q7) — alien word, typing buffer, and any future HUD strings must all be uppercase before they hit `font.render`
 
@@ -30,12 +30,12 @@ Run the relevant section after every change. Each stage in [`TODO.md`](TODO.md) 
 
 * All previous checks still pass
 * Three aliens visible with three different words and different first letters (`HELLO` / `WORLD` / `TYPE`, red / green / yellow, evenly spread across the upper third)
-* Pressing the first letter of any word locks onto that alien — the typed letter shows in cyan above the alien, untyped letters stay white
+* Targeting uses soft-lock behavior: typing a shared first letter keeps multiple matching candidates alive rather than hard-locking permanently
+* While ambiguous, the provisional focus is the lowest matching alien (closest to the bottom)
 * The bottom-of-screen typing buffer mirrors the typed prefix in real time
-* While locked, pressing a letter that does not extend the locked word is ignored — the lock survives, the buffer does not advance, no penalty (Q3 v1 default)
-* Letters that match no on-screen alien when no lock is active are silently ignored (no buffer growth, no lock acquired)
-* Completing the locked word and pressing `Enter` destroys the alien, clears the lock, and prints `kill` to the console
-* Pressing `Enter` on an empty or partial buffer clears the lock + buffer without firing (matches Stage 2's "Enter always commits" feel)
+* Typing the next disambiguating letter automatically shifts focus to the correct alien (e.g., `A` ambiguous between APPLE/ARROW, `AP` -> APPLE, `AR` -> ARROW)
+* While typing, a letter that would leave zero matches is ignored (no penalty, no lock reset)
+* Completing the focused word destroys the alien and clears typing state
 * `Backspace` shrinks the typed prefix by one letter; emptying the buffer releases the lock
 
 ## Stage 4 — Word list + spawning ✅
@@ -46,7 +46,7 @@ Run the relevant section after every change. Each stage in [`TODO.md`](TODO.md) 
 * Each alien gets a random word from `assets/words.txt` (lowercased on disk, rendered uppercase per Q7)
 * No two on-screen aliens carry the same word at the same time — verifiable by watching a few spawn cycles and confirming every visible word is unique
 * Aliens spawn at varied x positions across the playfield (not all stacked at one column); the X_MARGIN keeps the longest words from clipping the screen edge
-* Two aliens whose words happen to start with the same letter still resolve correctly: pressing that letter locks onto the lower one (lowest-y tie-break from Stage 3)
+* Two aliens whose words start with the same letter still resolve correctly: shared prefixes stay soft-locked, and provisional focus favors the lower alien until disambiguated
 * If every word in the list happens to be on screen at once, the next spawn tick is a silent no-op rather than a crash or duplicate
 
 ## Stage 5 — Falling + miss ✅
@@ -54,7 +54,7 @@ Run the relevant section after every change. Each stage in [`TODO.md`](TODO.md) 
 * All previous checks still pass
 * Aliens drift downward smoothly at `AlienSettings.SPEED` (no visible stutter — the float `Alien.position` accumulator means SPEED=0.5 advances rect.y by 1 px every other frame on average, not by 0/1 alternating in a jittery pattern)
 * Each spawned alien takes roughly 12 s to traverse from spawn band to bottom edge (slow enough to read and type comfortably; tune in Stage 6 once misses cost a heart)
-* When an alien's top edge crosses below `ScreenSettings.HEIGHT` the console logs `miss` and the sprite is removed (no lingering off-screen corpses)
+* When an alien's top edge crosses below `ScreenSettings.HEIGHT` the sprite is removed and one heart is consumed
 * If the alien that just fell off was the active typing target, the prefix lock clears and the bottom-of-screen typing buffer empties — the next letter the player presses re-acquires from scratch
 * If a *non-targeted* alien falls off, the active lock is undisturbed (verifiable by typing partway into one alien's word, then letting an unrelated alien fall: the cyan/white split on the locked alien stays exactly as it was)
 * Aliens still spawn at `SpawnSettings.SPAWN_Y = 80` so the word floating above is fully on-screen from the moment of spawn (Stage 4 first-frame-spawn check still passes)
@@ -83,22 +83,24 @@ Run the relevant section after every change. Each stage in [`TODO.md`](TODO.md) 
 * Pressing Enter from the game-over screen zeroes `SCORE` (high score row stays) *and* re-arms the spawn timer to the base 3000 ms — the restarted run starts at the easy cadence even if the previous run was at full ramp
 * If `high_score.txt` is missing (fresh install) or corrupt, boot proceeds without crashing — the `HIGH SCORE` row reads `0` until the first run completes
 
-## Stage 8 — Audio + explosion (not yet built)
+## Stage 8 — Audio + explosion ✅
 
 * All previous checks still pass
-* Laser SFX plays on word completion
+* Laser SFX plays on word completion (`laser` normally, `hyper` at max laser level)
 * Explosion sprite + SFX plays at the killed alien's position
-* Background music plays during a run, stops on game over
-* Master volume can be adjusted with `+` / `-`
-* No audio stutter or duplicate-play artifacts
+* Intro music plays on title screen; BGM plays during runs; game-over music plays after death
+* `Enter` pause/unpause correctly pauses/resumes the run music channel
+* Low-hearts alarms play at 2 and 1 hearts, and alarms stop on game over/restart
+* No audio stutter or duplicate-play artifacts across kill/pause/game-over transitions
 
-## Stage 9 — Menus + leaderboard (not yet built)
+## Stage 9 — Menus + leaderboard ✅
 
 * All previous checks still pass
 * Title screen shows on launch with "press Enter to begin" prompt
 * Game-over screen shows final score and high score
 * If score qualifies, initials entry appears (arrow keys cycle, Enter submits)
-* Pause: `Enter` pauses *only* when no word is currently being typed
+* Pause: `Enter` toggles pause during active gameplay; `Enter` resumes from pause
+* During initials entry, only initials controls (`UP`/`DOWN`/`LEFT`/`RIGHT` + `Enter`) are accepted
 * Full loop is reachable: title → play → game over → (initials) → title
 
 ## Stage 10 — V2 (per feature)

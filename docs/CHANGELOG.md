@@ -1427,3 +1427,203 @@ Powerups are now back in the Typing Hero branch in a minimal scope: red aliens c
      (all enemies intersecting target x-line).]
 **Why:** Implement requested behavior with minimal architecture change: preserve current typing lock loop while adding reintroduced reward/upgrade mechanics.
 **Editor:** GPT-5.3-Codex via Copilot
+
+## 2026-05-05 22:48 UTC — Fix laser upgrade behavior (twin then piercing)
+
+Green upgrade behavior now matches legacy intent in the Typing Hero adaptation: first green upgrade adds a twin side-beam assist, and the second upgrade makes those twin lanes piercing instead of replacing them with a single center lane.
+
+**File:** settings.py
+**Date and Time:** 2026-05-05 22:48 UTC
+**Lines (at time of edit):** 144-147 (modified)
+**Before:**
+    HEART_TYPE = 'heal'
+    LASER_UPGRADE_TYPE = 'laser_upgrade'
+
+    # Laser modes: 1=single, 2=twin, 3=burst.
+    MAX_LASER_LEVEL = 3
+**After:**
+    HEART_TYPE = 'heal'
+    LASER_UPGRADE_TYPE = 'laser_upgrade'
+    TWIN_BEAM_OFFSET = 18
+
+    # Laser modes: 1=single, 2=twin, 3=twin+piercing.
+    MAX_LASER_LEVEL = 3
+**Why:** Remove a shot-pattern magic number from `main.py` and document the intended progression semantics in one central settings location.
+**Editor:** GPT-5.3-Codex via Copilot
+
+**File:** main.py
+**Date and Time:** 2026-05-05 22:48 UTC
+**Lines (at time of edit):** 293-322 (modified)
+**Before:**
+    if laser_level == 2:
+        victims = [targeted_alien]
+        beam_offsets = (-18, 18)
+        ...
+        return victims
+
+    beam_x = targeted_alien.rect.centerx
+    victims = [alien for alien in aliens if alien.rect.left <= beam_x <= alien.rect.right]
+    victims.sort(key=lambda alien: alien.rect.centery, reverse=True)
+    return victims
+**After:**
+    victims = [targeted_alien]
+    beam_offsets = (-PowerupSettings.TWIN_BEAM_OFFSET, PowerupSettings.TWIN_BEAM_OFFSET)
+    for offset in beam_offsets:
+        ...
+        beam_targets.sort(key=lambda alien: alien.rect.centery, reverse=True)
+        if laser_level == 2:
+            victims.append(beam_targets[0])
+            continue
+        victims.extend(beam_targets)
+
+    return victims
+**Why:** Restore the intended two-step behavior: upgrade 1 adds twin-lane extra hits (first impact per lane), upgrade 2 adds piercing through those same lanes (all lane impacts) rather than switching to a different center-lane burst behavior.
+**Editor:** GPT-5.3-Codex via Copilot
+
+## 2026-05-05 22:54 UTC — Restore visible twin laser beams
+
+The previous fix restored hit resolution semantics but still left the upgraded shot looking like a single beam in many cases because Typing Hero was only drawing per-victim kill beams. This change restores legacy-style visible twin beams so the first green upgrade is immediately visible on every shot.
+
+**File:** settings.py
+**Date and Time:** 2026-05-05 22:54 UTC
+**Lines (at time of edit):** 147-158 (modified)
+**Before:**
+    # Laser modes: 1=single, 2=twin, 3=twin+piercing.
+    MAX_LASER_LEVEL = 3
+**After:**
+    # Laser modes: 1=single, 2=twin, 3=twin+piercing.
+    MAX_LASER_LEVEL = 3
+
+    class LaserSettings:
+        WIDTH = 4
+        HEIGHT = 20
+        SPEED = -8
+        COLORS = {
+            'single': (...),
+            'twin': (...),
+            'piercing': (...),
+        }
+**Why:** Centralize beam visuals so current Typing Hero shots can match the legacy green/white twin beam look and cyan/white piercing look without scattering constants through sprite code.
+**Editor:** GPT-5.3-Codex via Copilot
+
+**File:** core/sprites.py
+**Date and Time:** 2026-05-05 22:54 UTC
+**Lines (at time of edit):** 77-111 (modified)
+**Before:**
+    class KillLaser(...):
+        self.image = pygame.Surface((4, 20))
+        self.image.fill(ColorSettings.COLORS['WHITE'])
+        self.rect = self.image.get_rect(midbottom=(target_alien.rect.centerx, ScreenSettings.HEIGHT))
+        ...
+**After:**
+    class KillLaser(...):
+        self.colors = colors or LaserSettings.COLORS['single']
+        self.image = pygame.Surface((LaserSettings.WIDTH, LaserSettings.HEIGHT))
+        self.image.fill(self.colors[self.color_index])
+        self.rect = self.image.get_rect(midbottom=(origin_x, ScreenSettings.HEIGHT))
+        ...
+        self._animate_flicker()
+        ...
+**Why:** The old Typing Hero beam class could only draw one white center beam. Parameterizing color, origin x, and whether the beam resolves a kill lets the same sprite class render real legacy-style side beams while avoiding duplicate kill/explosion resolution.
+**Editor:** GPT-5.3-Codex via Copilot
+
+**File:** main.py
+**Date and Time:** 2026-05-05 22:54 UTC
+**Lines (at time of edit):** 258-359 (modified)
+**Before:**
+    victims = _resolve_shot_targets(...)
+    ...
+    for victim in victims:
+        ...
+        lasers.add(KillLaser(victim, explosions, audio))
+**After:**
+    victims = _resolve_shot_targets(...)
+    _spawn_shot_visuals(targeted_alien, victims, lasers, explosions, audio, laser_level)
+    ...
+    for victim in victims:
+        ...
+
+    def _spawn_shot_visuals(...):
+        [Spawn one single beam at level 1, otherwise always spawn two visible
+         side beams at +/- TWIN_BEAM_OFFSET using twin or piercing colors.]
+**Why:** Separate "what gets hit" from "what gets drawn" so upgraded shots are visible exactly like the legacy twin-laser presentation even when only one lane has a hittable alien.
+**Editor:** GPT-5.3-Codex via Copilot
+
+## 2026-05-05 23:02 UTC — Make lasers real projectiles and move drops to impact time
+
+Typing Hero now uses real upward-traveling player lasers instead of precomputing kills at word-completion time. A completed word spawns one laser at tier 1 or two lasers at tier 2/3; any alien physically in the lane can intercept them, and tier 3 lasers pierce through multiple aliens instead of stopping at the first hit. Red/green drops now roll only when an alien actually dies on impact.
+
+**File:** settings.py
+**Date and Time:** 2026-05-05 23:02 UTC
+**Lines (at time of edit):** 142-146 (modified)
+**Before:**
+    HEART_TYPE = 'heal'
+    LASER_UPGRADE_TYPE = 'laser_upgrade'
+    TWIN_BEAM_OFFSET = 18
+**After:**
+    HEART_TYPE = 'heal'
+    LASER_UPGRADE_TYPE = 'laser_upgrade'
+    TWIN_BEAM_OFFSET = 12
+**Why:** Match the legacy twin-laser spacing so the paired shots read like the original game instead of looking too wide.
+**Editor:** GPT-5.3-Codex via Copilot
+
+**File:** core/sprites.py
+**Date and Time:** 2026-05-05 23:02 UTC
+**Lines (at time of edit):** 77-101 (modified)
+**Before:**
+    class KillLaser(...):
+        [Target-bound beam that decided kills by checking one stored alien and
+         removed itself after that single target interaction.]
+**After:**
+    class KillLaser(...):
+        [Generic upward-traveling laser projectile with flicker colors,
+         `is_piercing` state, and a `hit_aliens` set so piercing beams can
+         continue through multiple enemies without double-hitting the same one.]
+**Why:** The previous implementation still treated lasers as target-bound effects. Converting them into actual projectiles makes lane blocking and piercing emerge from collision instead of from preselected victims.
+**Editor:** GPT-5.3-Codex via Copilot
+
+**File:** main.py
+**Date and Time:** 2026-05-05 23:02 UTC
+**Lines (at time of edit):** 7 (modified), 138-149 (modified), 244-350 (modified)
+**Before:**
+    [Word completion immediately preselected victims, awarded score, rolled
+     drops, and marked aliens as dying before any projectile reached them.]
+**After:**
+    [Word completion now only spawns one or two real lasers from the bottom of
+     the screen. A new `_resolve_laser_collisions(...)` step runs each frame
+     after `lasers.update()`, awards score, creates explosions, rolls drops,
+     kills aliens on actual impact, and only destroys non-piercing lasers on
+     their first collision.]
+**Why:** This restores the intended game feel: blockers can intercept shots, piercing is tactically meaningful, and red/green drops only appear after an alien has actually been killed.
+**Editor:** GPT-5.3-Codex via Copilot
+
+## 2026-05-05 23:07 UTC — Strip laser upgrades before hearts on misses
+
+Bottom-hit damage now mirrors the original rule more closely: if the player currently has laser upgrades, a missed alien strips those upgrades first instead of removing a heart. The medium warning alarm still plays on that strip event so the miss feels like a first-heart warning even though health is unchanged.
+
+**File:** main.py
+**Date and Time:** 2026-05-05 23:07 UTC
+**Lines (at time of edit):** 180-194 (modified), 391-401 (new)
+**Before:**
+    alien.kill()
+    hearts -= 1
+    if hearts == 2:
+        audio.play('alarm_med')
+    elif hearts == 1:
+        audio.play('alarm_low')
+**After:**
+    alien.kill()
+    hearts, laser_level = _apply_miss_penalty(
+        hearts,
+        laser_level,
+        audio,
+    )
+
+    def _apply_miss_penalty(...):
+        if laser_level > 1:
+            audio.play('alarm_med')
+            return hearts, 1
+        hearts -= 1
+        ...
+**Why:** This keeps the punishment meaningful while preserving the legacy "strip power first, health second" rhythm. Extracting the rule into a helper also keeps the game loop readable and makes the miss behavior explicit in one place.
+**Editor:** GPT-5.3-Codex via Copilot

@@ -9,6 +9,7 @@ from settings import (
     AlienSettings,
     AssetPaths,
     ColorSettings,
+    LaserSettings,
     PowerupSettings,
     ScreenSettings,
     WordSettings,
@@ -80,29 +81,29 @@ class Alien(pygame.sprite.Sprite):
         surface.blit(suffix_surf, suffix_rect)
 
 class KillLaser(pygame.sprite.Sprite):
-    """A vertical beam that travels up the screen to destroy a targeted alien."""
+    """A real player laser projectile that travels upward and may pierce aliens."""
 
-    def __init__(self, target_alien, explosion_group, audio):
+    def __init__(self, x, colors=None, is_piercing=False):
         super().__init__()
-        self.image = pygame.Surface((4, 20))
-        self.image.fill(ColorSettings.COLORS['WHITE'])
-        self.rect = self.image.get_rect(midbottom=(target_alien.rect.centerx, ScreenSettings.HEIGHT))
-        self.target = target_alien
-        self.explosion_group = explosion_group
-        self.speed = -8
-        self.audio = audio
+        self.colors = colors or LaserSettings.COLORS['single']
+        self.color_index = 0
+        self.image = pygame.Surface((LaserSettings.WIDTH, LaserSettings.HEIGHT))
+        self.image.fill(self.colors[self.color_index])
+        self.rect = self.image.get_rect(midbottom=(x, ScreenSettings.HEIGHT))
+        self.speed = LaserSettings.SPEED
+        self.is_piercing = is_piercing
+        self.hit_aliens = set()
+
+    def _animate_flicker(self):
+        """Alternate between the configured beam colors each frame."""
+        self.color_index = 1 - self.color_index
+        self.image.fill(self.colors[self.color_index])
 
     def update(self):
-        """Move up and kill both laser and target on contact."""
+        """Advance the projectile upward until it leaves the screen."""
         self.rect.y += self.speed
-        if self.rect.colliderect(self.target.rect) or self.rect.top <= self.target.rect.centery:
-            impact_explosion = Explosion(self.target.rect.centerx, self.target.rect.centery)
-            self.explosion_group.add(impact_explosion)
-            if self.audio:
-                self.audio.play('explosion')
-            self.target.kill()
-            self.kill()
-        elif self.rect.bottom < 0:
+        self._animate_flicker()
+        if self.rect.bottom < 0:
             self.kill()
 
 

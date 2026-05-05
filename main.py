@@ -5,12 +5,13 @@ import sys
 
 import pygame
 
-from core.animations import Background
+from core.animations import Background, Explosion
 from core.sprites import KillLaser, PowerUp
 from settings import (
     AlienSettings,
     FontSettings,
     HeartSettings,
+    LaserSettings,
     PowerupSettings,
     ScreenSettings,
     TypingSettings,
@@ -95,7 +96,7 @@ def run() -> None:
                         audio.pause_music()
                         state = 'paused'
                     elif event.key == pygame.K_BACKSPACE:
-                        word_manager.handle_backspace()
+                        word_manager.handle_backspace(aliens)
                     elif event.unicode.isalpha():
                         if word_manager.prefix_length < TypingSettings.MAX_LENGTH:
                             word_manager.handle_letter(event.unicode, aliens)
@@ -160,6 +161,18 @@ def run() -> None:
             audio.ensure_bgm_playing()
             aliens.update()
             lasers.update()
+            _resolve_laser_collisions(
+                lasers,
+                aliens,
+                explosions,
+                audio,
+                scores,
+                spawn_director,
+                powerups,
+                bg_group,
+                hearts,
+                laser_level,
+            )
             explosions.update()
             powerups.update()
 
@@ -172,11 +185,11 @@ def run() -> None:
                     if alien is word_manager.targeted_alien:
                         word_manager.clear_lock()
                     alien.kill()
-                    hearts -= 1
-                    if hearts == 2:
-                        audio.play('alarm_med')
-                    elif hearts == 1:
-                        audio.play('alarm_low')
+                    hearts, laser_level = _apply_miss_penalty(
+                        hearts,
+                        laser_level,
+                        audio,
+                    )
                     if hearts <= 0:
                         hearts = 0
                         word_manager.clear_lock()
@@ -264,25 +277,16 @@ def _resolve_shot_outcome(
     hearts,
     laser_level,
 ):
-    """Resolve one completed word into kills, drops, and shot visuals."""
+    """Resolve one completed word into one or more real laser projectiles."""
     targeted_alien = word_manager.handle_enter()
     if targeted_alien is None:
         return hearts, laser_level
 
-    victims = _resolve_shot_targets(targeted_alien, aliens, laser_level)
-    if not victims:
+    if targeted_alien not in aliens:
         return hearts, laser_level
 
-    for victim in victims:
-        if victim.is_dying:
-            continue
-        scores.add_for_color(victim.color)
-        _try_spawn_powerup_drop(victim, powerups, hearts, laser_level)
-        victim.is_dying = True
-        lasers.add(KillLaser(victim, explosions, audio))
+    _spawn_shot_lasers(targeted_alien, lasers, laser_level)
 
-    spawn_director.adjust_difficulty(scores.score)
-    spawn_director.sync_background_speed(bg_group, scores.score)
     if laser_level >= PowerupSettings.MAX_LASER_LEVEL:
         audio.play('hyper')
     else:
@@ -290,37 +294,71 @@ def _resolve_shot_outcome(
     return hearts, laser_level
 
 
-def _resolve_shot_targets(targeted_alien, aliens, laser_level):
-    """Return aliens hit by the current laser mode for one successful word."""
-    if targeted_alien not in aliens:
-        return []
-
+def _spawn_shot_lasers(targeted_alien, lasers, laser_level):
+    """Spawn the current laser loadout from the bottom of the screen."""
     if laser_level <= 1:
-        return [targeted_alien]
+        lasers.add(KillLaser(targeted_alien.rect.centerx, LaserSettings.COLORS['single']))
+        return
 
-    if laser_level == 2:
-        victims = [targeted_alien]
-        beam_offsets = (-18, 18)
-        for offset in beam_offsets:
-            beam_x = targeted_alien.rect.centerx + offset
-            beam_targets = [
-                alien
-                for alien in aliens
-                if alien not in victims and alien.rect.left <= beam_x <= alien.rect.right
-            ]
-            if not beam_targets:
+    twin_colors = (
+        LaserSettings.COLORS['piercing']
+        if laser_level >= PowerupSettings.MAX_LASER_LEVEL
+        else LaserSettings.COLORS['twin']
+    )
+    is_piercing = laser_level >= PowerupSettings.MAX_LASER_LEVEL
+    for offset in (-PowerupSettings.TWIN_BEAM_OFFSET, PowerupSettings.TWIN_BEAM_OFFSET):
+        lasers.add(
+            KillLaser(
+                targeted_alien.rect.centerx + offset,
+                twin_colors,
+                is_piercing=is_piercing,
+            )
+        )
+
+
+def _resolve_laser_collisions(
+    lasers,
+    aliens,
+    explosions,
+    audio,
+    scores,
+    spawn_director,
+    powerups,
+    bg_group,
+    hearts,
+    laser_level,
+):
+    """Resolve projectile-vs-alien hits, scoring, drops, and difficulty updates."""
+    score_changed = False
+    for laser in list(lasers):
+        hit_aliens = [
+            alien for alien in aliens
+            if alien not in laser.hit_aliens and laser.rect.colliderect(alien.rect)
+        ]
+        if not hit_aliens:
+            continue
+
+        # Lowest alien is physically closest to the laser origin at the bottom.
+        hit_aliens.sort(key=lambda alien: alien.rect.centery, reverse=True)
+        for alien in hit_aliens:
+            if alien not in aliens:
                 continue
-            beam_targets.sort(key=lambda alien: alien.rect.centery, reverse=True)
-            victims.append(beam_targets[0])
-        return victims
 
-    beam_x = targeted_alien.rect.centerx
-    victims = [
-        alien for alien in aliens
-        if alien.rect.left <= beam_x <= alien.rect.right
-    ]
-    victims.sort(key=lambda alien: alien.rect.centery, reverse=True)
-    return victims
+            laser.hit_aliens.add(alien)
+            explosions.add(Explosion(alien.rect.centerx, alien.rect.centery))
+            audio.play('explosion')
+            scores.add_for_color(alien.color)
+            _try_spawn_powerup_drop(alien, powerups, hearts, laser_level)
+            alien.kill()
+            score_changed = True
+
+            if not laser.is_piercing:
+                laser.kill()
+                break
+
+    if score_changed:
+        spawn_director.adjust_difficulty(scores.score)
+        spawn_director.sync_background_speed(bg_group, scores.score)
 
 
 def _try_spawn_powerup_drop(alien, powerups, hearts, laser_level):
@@ -359,6 +397,20 @@ def _resolve_powerups_at_bottom(powerups, hearts, laser_level, audio):
 
         powerup.kill()
 
+    return hearts, laser_level
+
+
+def _apply_miss_penalty(hearts, laser_level, audio):
+    """Apply the bottom-hit penalty: strip powerups first, then hearts."""
+    if laser_level > 1:
+        audio.play('alarm_med')
+        return hearts, 1
+
+    hearts -= 1
+    if hearts == 2:
+        audio.play('alarm_med')
+    elif hearts == 1:
+        audio.play('alarm_low')
     return hearts, laser_level
 
 

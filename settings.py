@@ -141,9 +141,23 @@ class PowerupSettings:
 
     HEART_TYPE = 'heal'
     LASER_UPGRADE_TYPE = 'laser_upgrade'
+    TWIN_BEAM_OFFSET = 12
 
-    # Laser modes: 1=single, 2=twin, 3=burst.
+    # Laser modes: 1=single, 2=twin, 3=twin+piercing.
     MAX_LASER_LEVEL = 3
+
+
+class LaserSettings:
+    """Player-shot visual tuning shared by kill beams and cosmetic twin beams."""
+
+    WIDTH = 4
+    HEIGHT = 20
+    SPEED = -8
+    COLORS = {
+        'single': (ColorSettings.COLORS['GREEN'], ColorSettings.COLORS['WHITE']),
+        'twin': (ColorSettings.COLORS['GREEN'], ColorSettings.COLORS['WHITE']),
+        'piercing': (ColorSettings.COLORS['CYAN'], ColorSettings.COLORS['WHITE']),
+    }
 
 
 class ExplosionSettings:
