@@ -27,7 +27,11 @@ class SpawnDirector:
         if word is None:
             return
 
-        color = random.choice(SpawnSettings.COLORS)
+        color = random.choices(
+            SpawnSettings.COLORS,
+            weights=SpawnSettings.SPAWN_CHANCE,
+            k=1,
+        )[0]
         x = random.randint(
             SpawnSettings.X_MARGIN,
             ScreenSettings.WIDTH - SpawnSettings.X_MARGIN,

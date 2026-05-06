@@ -1698,3 +1698,46 @@ Bottom-hit damage now mirrors the original rule more closely: if the player curr
         ...
 **Why:** This keeps the punishment meaningful while preserving the legacy "strip power first, health second" rhythm. Extracting the rule into a helper also keeps the game loop readable and makes the miss behavior explicit in one place.
 **Editor:** GPT-5.3-Codex via Copilot
+
+## 2026-05-06 15:55 UTC - Restore weighted alien spawn chances
+
+**File:** settings.py
+**Date and Time:** 2026-05-06 15:55 UTC
+**Lines (at time of edit):** 106-112, 131-136 (modified)
+**Before:**
+    class SpawnSettings:
+        COLORS = ('red', 'green', 'yellow', 'blue')
+
+    class AlienSettings:
+        DROP_CHANCE = {
+            'red': 0.20,
+            'green': 0.20,
+        }
+**After:**
+    class SpawnSettings:
+        COLORS = ('red', 'green', 'yellow', 'blue')
+        SPAWN_CHANCE = (50, 30, 15, 5)
+
+    class AlienSettings:
+        DROP_CHANCE = {
+            'red':    0.20,
+            'green':  0.20,
+            'yellow': 0.20,
+            'blue':   0.10,
+        }
+**Why:** The Typing Hero settings had regressed to uniform color spawning and a partial drop table. This restores the legacy spawn weighting model and a complete per-color drop-chance table so tuning reflects intended color rarity/value relationships.
+**Editor:** GitHub Copilot GPT-5.3-Codex via VS Code
+
+**File:** systems/spawn_director.py
+**Date and Time:** 2026-05-06 15:55 UTC
+**Lines (at time of edit):** 30-34 (modified)
+**Before:**
+    color = random.choice(SpawnSettings.COLORS)
+**After:**
+    color = random.choices(
+        SpawnSettings.COLORS,
+        weights=SpawnSettings.SPAWN_CHANCE,
+        k=1,
+    )[0]
+**Why:** Spawn selection now uses the configured weighted probability table instead of equal probability for every color.
+**Editor:** GitHub Copilot GPT-5.3-Codex via VS Code

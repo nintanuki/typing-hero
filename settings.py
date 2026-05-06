@@ -109,17 +109,17 @@ class SpawnSettings:
     SPAWN_Y = 80
     X_MARGIN = 80  # keep words from clipping screen edges
     COLORS = ('red', 'green', 'yellow', 'blue')
+    SPAWN_CHANCE = (50, 30, 15, 5)
 
 
 class AlienSettings:
     """Per-color speed and point values. Red is slowest/cheapest; blue is fastest/most valuable."""
 
-    # px/frame at 120 FPS: red ~12 s, green ~8.6 s, yellow ~6.7 s, blue ~5.5 s top-to-bottom
     SPEED = {
         'red':    0.5,
-        'green':  0.7,
-        'yellow': 0.9,
-        'blue':   1.1,
+        'green':  1,
+        'yellow': 1.5,
+        'blue':   2.5,
     }
     POINTS = {
         'red':    100,
@@ -128,8 +128,10 @@ class AlienSettings:
         'blue':   500,
     }
     DROP_CHANCE = {
-        'red': 0.20,
-        'green': 0.20,
+        'red':    0.50,
+        'green':  0.30,
+        'yellow': 0.20,
+        'blue':   0.10,
     }
 
 
