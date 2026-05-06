@@ -1545,6 +1545,114 @@ Green upgrade behavior now matches legacy intent in the Typing Hero adaptation: 
         if laser_level == 2:
             victims.append(beam_targets[0])
             continue
+
+## 2026-05-06 — Blue aliens no-damage, invincibility frames, red/white CRT flash, zigzag movement, predictive laser
+
+Four inter-related gameplay changes: blue aliens now deal no penalty on escape; taking damage triggers a brief invincibility window plus a red→white→red→white screen flash; yellow and blue aliens zig-zag horizontally while descending (ported from legacy); and the player laser now leads zig-zagging targets using a predictive intercept calculation.
+
+**File:** settings.py
+**Date and Time:** 2026-05-06 UTC
+**Lines (at time of edit):** 53-59 (AssetPaths), 133-140 (AlienSettings), 178-188 (HeartSettings → DamageSettings)
+**Before:**
+    HEART = os.path.join(GRAPHICS_DIR, 'heart.png')
+    TV = os.path.join(GRAPHICS_DIR, 'tv.png')
+    ...
+    DROP_CHANCE = { 'red': 0.50, ... 'blue': 0.10 }
+    ...
+    class HeartSettings: ...
+    class GameOverSettings: ...
+**After:**
+    TV_RED = os.path.join(GRAPHICS_DIR, 'tv_red.png')
+    TV_WHITE = os.path.join(GRAPHICS_DIR, 'tv_white.png')
+    ...
+    ZIGZAG_HORIZONTAL_SPEED = 2
+    ZIGZAG_THRESHOLD = 100
+    ...
+    class DamageSettings:
+        INVINCIBILITY_MS = 1500
+        FLASH_DURATION = 600
+        FLASH_INTERVAL = 120
+        FLASH_ALPHA = 200
+**Why:** New asset paths for flash overlays; zigzag constants extracted from legacy (were magic numbers inline); DamageSettings centralises all damage-feedback tunables.
+**Editor:** Claude Sonnet 4.6 via Copilot
+
+**File:** core/sprites.py
+**Date and Time:** 2026-05-06 UTC
+**Lines (at time of edit):** 1 (import), 35-38 (Alien.__init__), 40-45 (Alien.update)
+**Before:**
+    import os
+    import pygame
+    ...
+    self.is_dying = False
+    ...
+    def update(self):
+        self.position.y += ...
+        self.rect.y = round(self.position.y)
+**After:**
+    import os
+    import random
+    import pygame
+    ...
+    self.is_dying = False
+    self.zigzag_direction = random.choice((-1, 1)) if color in ('yellow', 'blue') else 0
+    self.zigzag_counter = 0
+    ...
+    def _move_zigzag(self): ...  # bounces off walls; yellow also flips on counter
+    def update(self):
+        self.position.y += ...
+        self.rect.y = round(self.position.y)
+        if self.color in ('yellow', 'blue'):
+            self._move_zigzag()
+**Why:** Port zigzag movement from legacy sprites.py. Direction is stored on the instance so the laser intercept calculation can read it each frame.
+**Editor:** Claude Sonnet 4.6 via Copilot
+
+**File:** ui/crt.py
+**Date and Time:** 2026-05-06 UTC
+**Lines (at time of edit):** 1-24 (full file replaced)
+**Before:**
+    class CRT:
+        def __init__(self, screen): ...  # only loaded tv.png
+        def create_crt_lines(self): ...
+        def draw(self): ...
+**After:**
+    class CRT:
+        def __init__(self, screen): ...  # also loads tv_red.png, tv_white.png
+        def _create_crt_lines(self): ...
+        def draw(self): ...  # stub comment noting future crt_enabled flag
+        def draw_damage_flash(self, show_red): ...  # separate from draw() so CRT toggle can't suppress it
+**Why:** Damage flash vignettes must remain visible even when the player later disables the CRT effect, so they live in a distinct method. The future disable hook goes in draw() only.
+**Editor:** Claude Sonnet 4.6 via Copilot
+
+**File:** main.py
+**Date and Time:** 2026-05-06 UTC
+**Lines (at time of edit):** imports, __init__, _reset_run_state, _apply_miss_penalty, _spawn_shot_lasers, _update_playing, _draw
+**Before:**
+    def _apply_miss_penalty(self) -> None:
+        if self.laser_level > 1: ...
+        self.hearts -= 1
+        ...
+    def _spawn_shot_lasers(self, targeted_alien):
+        KillLaser(targeted_alien.rect.centerx, ...)
+        ...
+    # _draw: self.crt.draw(); pygame.display.flip()
+    # _update_playing: alien.kill(); self._apply_miss_penalty()
+**After:**
+    def _trigger_damage_flash(self) -> None: ...  # sets _invincible_until, _flash_start, _flash_end
+    def _apply_miss_penalty(self, alien_color: str) -> None:
+        if alien_color == 'blue': return          # blue = no damage
+        if ticks < self._invincible_until: return  # invincibility frames
+        self._trigger_damage_flash()
+        if self.laser_level > 1: ...
+        self.hearts -= 1
+        ...
+    def _spawn_shot_lasers(self, targeted_alien):
+        # predictive intercept: aim_x accounts for zigzag_direction * speed * travel_frames
+        KillLaser(aim_x, ...)
+        ...
+    # _draw: self.crt.draw(); draw_damage_flash if flash active; pygame.display.flip()
+    # _update_playing: alien.kill(); self._apply_miss_penalty(alien.color)
+**Why:** Blue-alien no-damage (score risk only); invincibility frames prevent two adjacent aliens dealing double damage; damage flash provides visual hit feedback independent of the CRT; predictive laser makes hitting zigzag aliens fair and satisfying.
+**Editor:** Claude Sonnet 4.6 via Copilot
         victims.extend(beam_targets)
 
     return victims

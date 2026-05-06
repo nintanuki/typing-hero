@@ -1,6 +1,7 @@
 """Sprite classes for Typing Hero."""
 
 import os
+import random
 
 import pygame
 
@@ -34,10 +35,47 @@ class Alien(pygame.sprite.Sprite):
         self.position = pygame.math.Vector2(self.rect.topleft)
         self.is_dying = False
 
+        # Zigzag state: active for yellow and blue only.
+        # Yellow flips direction on a frame counter; blue wall-bounces only.
+        self.zigzag_direction = random.choice((-1, 1)) if color in ('yellow', 'blue') else 0
+        self.zigzag_counter = 0
+
+    def _move_zigzag(self):
+        """Advance horizontal zigzag oscillation for yellow and blue aliens.
+
+        Yellow flips direction every ZIGZAG_THRESHOLD frames (wide sweep).
+        Blue wall-bounces continuously without a timer (tighter bounce).
+        Both reverse immediately on hitting a screen edge.
+        """
+        self.position.x += (
+            self.zigzag_direction
+            * AlienSettings.ZIGZAG_HORIZONTAL_SPEED
+            * self.level_speed_multiplier
+        )
+        self.rect.x = round(self.position.x)
+
+        if self.color == 'yellow':
+            self.zigzag_counter += 1
+            if self.zigzag_counter >= AlienSettings.ZIGZAG_THRESHOLD:
+                self.zigzag_counter = 0
+                self.zigzag_direction *= -1
+
+        # Both colors bounce off screen edges.
+        if self.rect.left < 0:
+            self.rect.left = 0
+            self.position.x = float(self.rect.x)
+            self.zigzag_direction = 1
+        elif self.rect.right > ScreenSettings.WIDTH:
+            self.rect.right = ScreenSettings.WIDTH
+            self.position.x = float(self.rect.x)
+            self.zigzag_direction = -1
+
     def update(self):
         """Advance one frame of descent at color speed scaled by level multiplier."""
         self.position.y += AlienSettings.SPEED[self.color] * self.level_speed_multiplier
         self.rect.y = round(self.position.y)
+        if self.color in ('yellow', 'blue'):
+            self._move_zigzag()
 
     @classmethod
     def set_level_speed_multiplier(cls, multiplier):

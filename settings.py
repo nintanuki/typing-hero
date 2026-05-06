@@ -71,6 +71,8 @@ class AssetPaths:
     PLAYER = os.path.join(GRAPHICS_DIR, 'player_ship.png')
     HEART = os.path.join(GRAPHICS_DIR, 'heart.png')
     TV = os.path.join(GRAPHICS_DIR, 'tv.png')
+    TV_RED = os.path.join(GRAPHICS_DIR, 'tv_red.png')
+    TV_WHITE = os.path.join(GRAPHICS_DIR, 'tv_white.png')
 
 
 class WordSettings:
@@ -133,6 +135,11 @@ class AlienSettings:
         'yellow': 0.20,
         'blue':   0.10,
     }
+    # Yellow and blue aliens drift horizontally while descending.
+    # ZIGZAG_THRESHOLD is the frame count before yellow reverses direction;
+    # blue reverses only on hitting a screen edge.
+    ZIGZAG_HORIZONTAL_SPEED = 2
+    ZIGZAG_THRESHOLD = 100
 
 
 class PowerupSettings:
@@ -187,6 +194,15 @@ class HeartSettings:
     TOP_MARGIN = 8
     RIGHT_MARGIN = 30
     SPACING = 10
+
+
+class DamageSettings:
+    """Tunables for player damage feedback: invincibility frames and screen flash."""
+
+    INVINCIBILITY_MS = 1500  # ms the player is protected after a hit
+    FLASH_DURATION = 600     # ms the red/white vignette flashes after a hit
+    FLASH_INTERVAL = 120     # ms per red↔white toggle (~5 toggles across FLASH_DURATION)
+    FLASH_ALPHA = 200        # opacity of the damage vignette overlay (0-255)
 
 
 class GameOverSettings:

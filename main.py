@@ -12,6 +12,7 @@ from core.animations import Background, Explosion
 from core.sprites import Alien, KillLaser, PowerUp
 from settings import (
     AlienSettings,
+    DamageSettings,
     FontSettings,
     HeartSettings,
     LaserSettings,
@@ -69,6 +70,9 @@ class GameManager:
         self.hearts = HeartSettings.MAX
         self.laser_level = 1
         self.current_level = 1
+        self._invincible_until = 0   # ticks when invincibility expires
+        self._flash_start = 0        # ticks when the current damage flash began
+        self._flash_end = 0          # ticks when the current damage flash expires
         self.state: Literal['intro', 'playing', 'paused', 'game_over'] = 'intro'
         self.running = True
 
@@ -105,6 +109,9 @@ class GameManager:
         self.hearts = HeartSettings.MAX
         self.laser_level = 1
         self.current_level = 1
+        self._invincible_until = 0
+        self._flash_start = 0
+        self._flash_end = 0
 
         self.audio.stop_alarms()
         self.audio.stop_bgm()
@@ -131,15 +138,39 @@ class GameManager:
     def _spawn_shot_lasers(self, targeted_alien: Alien) -> None:
         """Spawn the current laser loadout aimed at the resolved alien.
 
+        For zig-zagging aliens (yellow, blue) the laser is fired at the alien's
+        predicted position rather than its current center, so the shot leads the
+        target and connects mid-flight.
+
         Args:
             targeted_alien: The alien whose completed word triggered the shot.
         """
+        # --- Predictive intercept ---
+        # The laser travels from y=HEIGHT upward at |LaserSettings.SPEED| px/frame.
+        # Time to reach the alien = distance / speed, where distance is how far
+        # the laser must climb from the bottom edge to the alien's current y.
+        # The alien moves horizontally at zigzag_direction * ZIGZAG_HORIZONTAL_SPEED
+        # per frame, so multiplying by travel_frames gives the horizontal offset
+        # by the time of impact.
+        # For non-zigzag aliens (red, green) zigzag_direction == 0, so aim_x equals
+        # the alien's current center with no change in behavior.
+        # Yellow can flip direction mid-flight (counter-based), so the intercept is
+        # an approximation — it still leads the target rather than firing behind it.
+        distance = ScreenSettings.HEIGHT - targeted_alien.rect.centery
+        travel_frames = distance / abs(LaserSettings.SPEED)
+        aim_x = round(
+            targeted_alien.rect.centerx
+            + targeted_alien.zigzag_direction
+            * AlienSettings.ZIGZAG_HORIZONTAL_SPEED
+            * targeted_alien.level_speed_multiplier
+            * travel_frames
+        )
+        # Clamp so the laser can't spawn off-screen.
+        aim_x = max(0, min(ScreenSettings.WIDTH, aim_x))
+
         if self.laser_level <= 1:
             self.lasers.add(
-                KillLaser(
-                    targeted_alien.rect.centerx,
-                    LaserSettings.COLORS['single'],
-                )
+                KillLaser(aim_x, LaserSettings.COLORS['single'])
             )
             return
 
@@ -155,7 +186,7 @@ class GameManager:
         ):
             self.lasers.add(
                 KillLaser(
-                    targeted_alien.rect.centerx + offset,
+                    aim_x + offset,
                     twin_colors,
                     is_piercing=is_piercing,
                 )
@@ -243,8 +274,32 @@ class GameManager:
 
             powerup.kill()
 
-    def _apply_miss_penalty(self) -> None:
-        """Apply the bottom-hit penalty, stripping upgrades before hearts."""
+    def _trigger_damage_flash(self) -> None:
+        """Start the invincibility window and schedule the red/white screen flash."""
+        now = pygame.time.get_ticks()
+        self._invincible_until = now + DamageSettings.INVINCIBILITY_MS
+        self._flash_start = now
+        self._flash_end = now + DamageSettings.FLASH_DURATION
+
+    def _apply_miss_penalty(self, alien_color: str) -> None:
+        """Apply the bottom-hit penalty for a missed alien.
+
+        Blue aliens deal no damage — escaping them is a missed score opportunity
+        only.  For other colors, a hit strips the laser upgrade first; once that
+        is gone, hearts are deducted.  Invincibility frames block all damage
+        during the post-hit recovery window.
+
+        Args:
+            alien_color: The color of the alien that reached the bottom.
+        """
+        if alien_color == 'blue':
+            return
+
+        if pygame.time.get_ticks() < self._invincible_until:
+            return  # Still inside the invincibility window from a recent hit.
+
+        self._trigger_damage_flash()
+
         if self.laser_level > 1:
             self.audio.play('alarm_med')
             self.laser_level = 1
@@ -442,7 +497,7 @@ class GameManager:
                 self.word_manager.clear_lock()
 
             alien.kill()
-            self._apply_miss_penalty()
+            self._apply_miss_penalty(alien.color)
             if self.hearts <= 0:
                 self._enter_game_over()
                 break
@@ -524,6 +579,12 @@ class GameManager:
             self.game_over_screen.draw(self.screen, self.scores.score, self.scores)
 
         self.crt.draw()
+        # Damage flash is drawn after the CRT so it sits on top of everything.
+        # It's separate from crt.draw() so a future CRT-disable toggle won't hide it.
+        if self.state == 'playing' and pygame.time.get_ticks() < self._flash_end:
+            elapsed = pygame.time.get_ticks() - self._flash_start
+            show_red = (elapsed // DamageSettings.FLASH_INTERVAL) % 2 == 0
+            self.crt.draw_damage_flash(show_red)
         pygame.display.flip()
 
     def run(self) -> None:
