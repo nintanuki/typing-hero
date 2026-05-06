@@ -9,7 +9,7 @@ from typing import Literal
 import pygame
 
 from core.animations import Background, Explosion
-from core.sprites import Alien, KillLaser, PowerUp, RainbowBeam
+from core.sprites import Alien, KillLaser, PowerUp, RainbowLaser
 from settings import (
     AlienSettings,
     DamageSettings,
@@ -18,6 +18,7 @@ from settings import (
     LaserSettings,
     PowerupSettings,
     ScreenSettings,
+    ShieldSettings,
     TypingSettings,
     WordSettings,
 )
@@ -71,10 +72,12 @@ class GameManager:
         self.laser_level = 1
         self.burst_tier = 0
         self._pending_follow_ups: list = []  # (fire_at_ticks, alien_ref)
+        self._rainbow_beam_until = 0  # ticks when the active rainbow beam expires
         self.current_level = 1
         self._invincible_until = 0   # ticks when invincibility expires
         self._flash_start = 0        # ticks when the current damage flash began
         self._flash_end = 0          # ticks when the current damage flash expires
+        self._shield_until = 0       # ticks when the shield powerup expires
         self.state: Literal['intro', 'playing', 'paused', 'game_over'] = 'intro'
         self.running = True
 
@@ -112,10 +115,12 @@ class GameManager:
         self.laser_level = 1
         self.burst_tier = 0
         self._pending_follow_ups = []
+        self._rainbow_beam_until = 0
         self.current_level = 1
         self._invincible_until = 0
         self._flash_start = 0
         self._flash_end = 0
+        self._shield_until = 0
 
         self.audio.stop_alarms()
         self.audio.stop_bgm()
@@ -136,10 +141,7 @@ class GameManager:
             return
 
         self._spawn_shot_lasers(targeted_alien)
-        if self.laser_level >= PowerupSettings.MAX_LASER_LEVEL:
-            self.audio.play('hyper')
-        else:
-            self.audio.play('laser')
+        self._play_shot_sound()
 
         if self.burst_tier >= 1:
             now = pygame.time.get_ticks()
@@ -150,6 +152,13 @@ class GameManager:
             )
             for delay in delays:
                 self._pending_follow_ups.append((now + delay, targeted_alien))
+
+    def _play_shot_sound(self) -> None:
+        """Play the shot SFX that matches the current laser tier."""
+        if self.laser_level >= PowerupSettings.MAX_LASER_LEVEL:
+            self.audio.play('hyper')
+            return
+        self.audio.play('laser')
 
     def _spawn_shot_lasers(self, targeted_alien: Alien) -> None:
         """Spawn the current laser loadout aimed at the resolved alien.
@@ -251,12 +260,17 @@ class GameManager:
             alien: The alien that was just destroyed.
         """
         if alien.color == 'red':
-            if self.hearts >= HeartSettings.MAX:
-                return
-            if random.random() < AlienSettings.DROP_CHANCE['red']:
+            if (
+                not self._shield_is_active()
+                and random.random() < PowerupSettings.SHIELD_DROP_CHANCE
+            ):
                 self.powerups.add(
-                    PowerUp(alien.rect.center, PowerupSettings.HEART_TYPE)
+                    PowerUp(alien.rect.center, PowerupSettings.SHIELD_TYPE)
                 )
+                return
+
+            if self.hearts < HeartSettings.MAX and random.random() < AlienSettings.DROP_CHANCE['red']:
+                self.powerups.add(PowerUp(alien.rect.center, PowerupSettings.HEART_TYPE))
             return
 
         if alien.color == 'green':
@@ -296,6 +310,9 @@ class GameManager:
                 if self.hearts < HeartSettings.MAX:
                     self.hearts += 1
                     self.audio.play('powerup_heart')
+            elif powerup.kind == PowerupSettings.SHIELD_TYPE:
+                self._shield_until = pygame.time.get_ticks() + ShieldSettings.DURATION_MS
+                self.audio.play('powerup_weapon')
             elif powerup.kind == PowerupSettings.LASER_UPGRADE_TYPE:
                 if self.laser_level < PowerupSettings.MAX_LASER_LEVEL:
                     self.laser_level += 1
@@ -308,10 +325,31 @@ class GameManager:
                     self.burst_tier += 1
                     self.audio.play('powerup_twin')
             elif powerup.kind == PowerupSettings.RAINBOW_BEAM_TYPE:
-                self.lasers.add(RainbowBeam())
+                self._rainbow_beam_until = (
+                    pygame.time.get_ticks() + PowerupSettings.RAINBOW_BEAM_DURATION
+                )
                 self.audio.play('powerup_weapon')
 
             powerup.kill()
+
+    def _shield_is_active(self) -> bool:
+        """Return True while the temporary shield should block miss penalties."""
+        return pygame.time.get_ticks() < self._shield_until
+
+    def _apply_shield_bottom_kill(self, alien: Alien) -> None:
+        """Treat a bottom collision as a kill while the shield is active.
+
+        Args:
+            alien: The alien that reached the bottom edge while shielded.
+        """
+        self.explosions.add(Explosion(alien.rect.centerx, alien.rect.centery))
+        self.audio.play('explosion')
+        self.scores.add_for_color(alien.color)
+        self._try_spawn_powerup_drop(alien)
+        alien.kill()
+
+        self.spawn_director.adjust_difficulty(self.scores.score)
+        self.spawn_director.sync_background_speed(self.bg_group, self.scores.score)
 
     def _trigger_damage_flash(self) -> None:
         """Start the invincibility window and schedule the red/white screen flash."""
@@ -331,6 +369,9 @@ class GameManager:
         Args:
             alien_color: The color of the alien that reached the bottom.
         """
+        if self._shield_is_active():
+            return
+
         if alien_color == 'blue':
             return
 
@@ -520,6 +561,19 @@ class GameManager:
     # PER-FRAME UPDATE / RENDER
     # -------------------------
 
+    def _update_rainbow_beam(self) -> None:
+        """Spawn a fresh RainbowLaser slice every frame while the beam is active.
+
+        The cone effect emerges from the stacking — older slices have grown wider
+        and traveled further, so a stack forms an upside-down triangle.  The
+        'hyper' SFX replays each frame on the same channel; the channel auto-cuts
+        the previous play so the effect is a sustained hum, not a stutter.
+        """
+        if pygame.time.get_ticks() >= self._rainbow_beam_until:
+            return
+        self.lasers.add(RainbowLaser())
+        self.audio.play('hyper')
+
     def _update_follow_up_shots(self) -> None:
         """Fire any burst follow-up shots whose delay has elapsed.
 
@@ -538,7 +592,7 @@ class GameManager:
                 continue
             if alien in self.aliens:
                 self._spawn_shot_lasers(alien)
-                self.audio.play('laser')
+                self._play_shot_sound()
         self._pending_follow_ups = remaining
 
     def _update_playing(self) -> None:
@@ -546,6 +600,7 @@ class GameManager:
         self.audio.ensure_bgm_playing()
         self.aliens.update()
         self.lasers.update()
+        self._update_rainbow_beam()
         self._update_follow_up_shots()
         self._resolve_laser_collisions()
         self.explosions.update()
@@ -558,6 +613,10 @@ class GameManager:
 
             if alien is self.word_manager.targeted_alien:
                 self.word_manager.clear_lock()
+
+            if self._shield_is_active():
+                self._apply_shield_bottom_kill(alien)
+                continue
 
             alien.kill()
             self._apply_miss_penalty(alien.color)
@@ -642,6 +701,16 @@ class GameManager:
             self.game_over_screen.draw(self.screen, self.scores.score, self.scores)
 
         self.crt.draw()
+        if self.state == 'playing' and self._shield_is_active():
+            shield_time_left = self._shield_until - pygame.time.get_ticks()
+            if shield_time_left <= ShieldSettings.WARNING_MS:
+                show_blue = (
+                    (shield_time_left // ShieldSettings.WARNING_FLASH_INTERVAL) % 2
+                ) == 0
+            else:
+                show_blue = True
+            self.crt.draw_shield_flash(show_blue)
+
         # Damage flash is drawn after the CRT so it sits on top of everything.
         # It's separate from crt.draw() so a future CRT-disable toggle won't hide it.
         if self.state == 'playing' and pygame.time.get_ticks() < self._flash_end:

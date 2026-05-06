@@ -145,21 +145,23 @@ class KillLaser(pygame.sprite.Sprite):
             self.kill()
 
 
-class RainbowBeam(pygame.sprite.Sprite):
-    """A slow wide expanding beam fired from the bottom-center of the screen.
+class RainbowLaser(pygame.sprite.Sprite):
+    """One slice of the rainbow beam: starts 1 px wide, grows wide, travels up.
 
-    Starts 1 px wide and grows to full screen width over ~1 second while drifting
-    upward.  Any alien the beam overlaps is destroyed once.
+    The cone effect emerges from the GameManager spawning one of these per frame
+    while the rainbow beam is active.  Older slices have grown wider and traveled
+    further, so a stack of them forms an upside-down triangle naturally — same
+    technique as the legacy game.
     """
 
     def __init__(self):
-        """Spawn at the bottom-center of the screen with a 1-pixel starting width."""
+        """Spawn at the bottom-center of the screen, 1 px wide."""
         super().__init__()
         self.is_piercing = True
         self.hit_aliens = set()
         self.hue = 0
         self.current_width = 1
-        self.target_width = ScreenSettings.WIDTH
+        self.target_width = PowerupSettings.RAINBOW_BEAM_WIDTH
         self.image = pygame.Surface(
             (self.current_width, PowerupSettings.RAINBOW_BEAM_HEIGHT)
         )
@@ -168,27 +170,25 @@ class RainbowBeam(pygame.sprite.Sprite):
             midbottom=(ScreenSettings.WIDTH // 2, ScreenSettings.HEIGHT)
         )
         self.pos_y = float(self.rect.y)
+        self.speed = LaserSettings.SPEED  # negative; same upward speed as kill lasers
 
-    def _rebuild_surface(self):
-        """Recreate the surface at the new width, preserving vertical position."""
+    def _grow(self):
+        """Widen the slice toward target_width, rebuilding the surface in place."""
+        if self.current_width >= self.target_width:
+            return
+        self.current_width = min(
+            self.target_width,
+            self.current_width + PowerupSettings.RAINBOW_BEAM_GROWTH_SPEED,
+        )
+        old_center = self.rect.center
         self.image = pygame.Surface(
             (self.current_width, PowerupSettings.RAINBOW_BEAM_HEIGHT)
         )
-        self.rect = self.image.get_rect(
-            midtop=(ScreenSettings.WIDTH // 2, round(self.pos_y))
-        )
-
-    def _grow(self):
-        """Widen the beam by RAINBOW_BEAM_GROWTH_SPEED px until target width is reached."""
-        if self.current_width < self.target_width:
-            self.current_width = min(
-                self.target_width,
-                self.current_width + PowerupSettings.RAINBOW_BEAM_GROWTH_SPEED,
-            )
-            self._rebuild_surface()
+        self.rect = self.image.get_rect(center=old_center)
+        self.pos_y = float(self.rect.y)
 
     def _animate_rainbow(self):
-        """Advance the hue and fill the beam surface with shifting rainbow segments."""
+        """Repaint the slice with shifting rainbow segments stacked vertically."""
         self.hue = (self.hue + PowerupSettings.RAINBOW_BEAM_HUE_STEP) % 360
         segment_height = (
             PowerupSettings.RAINBOW_BEAM_HEIGHT // PowerupSettings.RAINBOW_BEAM_SEGMENTS
@@ -197,16 +197,16 @@ class RainbowBeam(pygame.sprite.Sprite):
             seg_hue = (self.hue + i * PowerupSettings.RAINBOW_BEAM_SEGMENT_SHIFT) % 360
             color = pygame.Color(0)
             color.hsva = (seg_hue, 100, 100, 100)
-            seg_rect = pygame.Rect(
-                0, i * segment_height, self.current_width, segment_height
+            self.image.fill(
+                color,
+                pygame.Rect(0, i * segment_height, self.current_width, segment_height),
             )
-            self.image.fill(color, seg_rect)
 
     def update(self):
         """Grow, animate, drift upward one frame, and self-destruct when off-screen."""
         self._grow()
         self._animate_rainbow()
-        self.pos_y += PowerupSettings.RAINBOW_BEAM_SPEED
+        self.pos_y += self.speed
         self.rect.y = round(self.pos_y)
         if self.rect.bottom < 0:
             self.kill()
@@ -218,6 +218,9 @@ class PowerUp(pygame.sprite.Sprite):
     def __init__(self, pos, kind):
         super().__init__()
         self.kind = kind
+        self._anim_tick = 0
+        self._anim_interval = 6
+        self._anim_frame = 0
 
         if self.kind == PowerupSettings.HEART_TYPE:
             self.image = pygame.image.load(AssetPaths.HEART).convert_alpha()
@@ -228,8 +231,10 @@ class PowerUp(pygame.sprite.Sprite):
         self.image = pygame.Surface((diameter, diameter), pygame.SRCALPHA)
         if self.kind == PowerupSettings.BURST_TYPE:
             self._draw_yellow_diamond()
+        elif self.kind == PowerupSettings.SHIELD_TYPE:
+            self._draw_shield_circle()
         elif self.kind == PowerupSettings.RAINBOW_BEAM_TYPE:
-            self._draw_blue_diamond()
+            self._draw_rainbow_star()
         else:
             self._draw_green_diamond()
         self.rect = self.image.get_rect(center=pos)
@@ -258,22 +263,68 @@ class PowerUp(pygame.sprite.Sprite):
         pygame.draw.polygon(self.image, ColorSettings.COLORS['YELLOW'], points)
         pygame.draw.polygon(self.image, ColorSettings.COLORS['WHITE'], points, width=2)
 
-    def _draw_blue_diamond(self):
-        """Render the blue rainbow-beam token as a wider, flatter diamond."""
-        # A flatter (wider) diamond distinguishes it visually from the other tokens.
-        r = PowerupSettings.RADIUS
-        points = [
-            (r, 4),
-            (r * 2, r),
-            (r, r * 2 - 4),
-            (0, r),
-        ]
-        pygame.draw.polygon(self.image, ColorSettings.COLORS['BLUE'], points)
-        pygame.draw.polygon(self.image, ColorSettings.COLORS['WHITE'], points, width=2)
+    def _draw_shield_circle(self):
+        """Render the shield token as a blue circle with a white outline."""
+        radius = PowerupSettings.RADIUS
+        center = (radius, radius)
+        pygame.draw.circle(self.image, ColorSettings.COLORS['BLUE'], center, radius)
+        pygame.draw.circle(self.image, ColorSettings.COLORS['WHITE'], center, radius, width=2)
+
+    def _draw_star(self, fill_color, outline_color):
+        """Draw a five-point star centered in the token surface.
+
+        Args:
+            fill_color: RGB tuple used to fill the star.
+            outline_color: RGB tuple used for the star border.
+        """
+        radius = PowerupSettings.RADIUS
+        cx, cy = radius, radius
+        outer_radius = radius
+        inner_radius = max(3, int(radius * 0.45))
+        points = []
+        for point_index in range(10):
+            angle = (point_index * 36) - 90
+            active_radius = outer_radius if point_index % 2 == 0 else inner_radius
+            vector = pygame.math.Vector2()
+            vector.from_polar((active_radius, angle))
+            points.append((cx + vector.x, cy + vector.y))
+
+        pygame.draw.polygon(self.image, fill_color, points)
+        pygame.draw.polygon(self.image, outline_color, points, width=2)
+
+    def _draw_rainbow_star(self):
+        """Render the rainbow-beam token as a flashing rainbow star."""
+        rainbow_frames = (
+            ColorSettings.COLORS['RED'],
+            ColorSettings.COLORS['YELLOW'],
+            ColorSettings.COLORS['GREEN'],
+            ColorSettings.COLORS['CYAN'],
+            ColorSettings.COLORS['BLUE'],
+            ColorSettings.COLORS['WHITE'],
+        )
+        frame_color = rainbow_frames[self._anim_frame % len(rainbow_frames)]
+        self._draw_star(frame_color, ColorSettings.COLORS['WHITE'])
+
+    def _animate(self):
+        """Advance token-only animation frames for animated powerups."""
+        if self.kind not in (PowerupSettings.RAINBOW_BEAM_TYPE,):
+            return
+
+        self._anim_tick += 1
+        if self._anim_tick < self._anim_interval:
+            return
+
+        self._anim_tick = 0
+        self._anim_frame += 1
+        center = self.rect.center
+        self.image.fill((0, 0, 0, 0))
+        self._draw_rainbow_star()
+        self.rect = self.image.get_rect(center=center)
 
     def update(self):
         """Move down one frame at configured speed."""
         self.rect.y += PowerupSettings.SPEED
+        self._animate()
 
     def reached_bottom(self):
         """Return True once the powerup has reached the bottom edge of the screen."""

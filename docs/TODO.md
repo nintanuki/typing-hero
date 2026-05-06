@@ -95,3 +95,4 @@ At the spawn cadences the difficulty ramp can reach, word readability becomes th
 - Delete `legacy/` entirely once it has no more reference value (after all needed pieces have been ported).
 - initials still need to be moved up a little, or leaderboard down... or remove the blue line
 - Consider optional manual target cycling as an accessibility fallback if soft-lock ambiguity still feels off in dense waves (do not enable by default).
+- Replace the current normal shield overlay (solid blue) with a smoother fade/transition effect; keep fast end-of-duration flashing behavior.

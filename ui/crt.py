@@ -13,6 +13,8 @@ class CRT:
         self.tv = pygame.transform.scale(self.tv, ScreenSettings.RESOLUTION)
 
         # Damage flash overlays — loaded once, reused every flash frame.
+        self.tv_blue = pygame.image.load(AssetPaths.TV_BLUE).convert_alpha()
+        self.tv_blue = pygame.transform.scale(self.tv_blue, ScreenSettings.RESOLUTION)
         self.tv_red = pygame.image.load(AssetPaths.TV_RED).convert_alpha()
         self.tv_red = pygame.transform.scale(self.tv_red, ScreenSettings.RESOLUTION)
         self.tv_white = pygame.image.load(AssetPaths.TV_WHITE).convert_alpha()
@@ -48,4 +50,14 @@ class CRT:
         """
         overlay = self.tv_red if show_red else self.tv_white
         overlay.set_alpha(DamageSettings.FLASH_ALPHA)
+        self.screen.blit(overlay, (0, 0))
+
+    def draw_shield_flash(self, show_blue: bool) -> None:
+        """Blit the shield vignette while the shield powerup is active.
+
+        Args:
+            show_blue: True for the blue phase, False for the white phase.
+        """
+        overlay = self.tv_blue if show_blue else self.tv_white
+        overlay.set_alpha(ShieldSettings.FLASH_ALPHA)
         self.screen.blit(overlay, (0, 0))

@@ -71,6 +71,7 @@ class AssetPaths:
     PLAYER = os.path.join(GRAPHICS_DIR, 'player_ship.png')
     HEART = os.path.join(GRAPHICS_DIR, 'heart.png')
     TV = os.path.join(GRAPHICS_DIR, 'tv.png')
+    TV_BLUE = os.path.join(GRAPHICS_DIR, 'tv_blue.png')
     TV_RED = os.path.join(GRAPHICS_DIR, 'tv_red.png')
     TV_WHITE = os.path.join(GRAPHICS_DIR, 'tv_white.png')
 
@@ -149,10 +150,12 @@ class PowerupSettings:
     RADIUS = 12
 
     HEART_TYPE = 'heal'
+    SHIELD_TYPE = 'shield'
     LASER_UPGRADE_TYPE = 'laser_upgrade'
     BURST_TYPE = 'burst'
     RAINBOW_BEAM_TYPE = 'rainbow_beam'
     TWIN_BEAM_OFFSET = 12
+    SHIELD_DROP_CHANCE = 0.10
 
     # Laser modes: 1=single, 2=twin, 3=twin+piercing.
     MAX_LASER_LEVEL = 3
@@ -165,15 +168,28 @@ class PowerupSettings:
     BURST_TIER1_DELAY_MS = 250
     BURST_TIER2_DELAYS_MS = (200, 400)
 
-    # Rainbow beam (blue powerup): a slow wide expanding beam fired from the
-    # bottom-center.  Starts 1 px wide, grows to full screen width at
-    # RAINBOW_BEAM_GROWTH_SPEED px/frame, then drifts upward until off-screen.
-    RAINBOW_BEAM_SPEED = -1          # px per frame (slow enough to sweep ~6 s)
-    RAINBOW_BEAM_HEIGHT = 40         # sprite height in px
-    RAINBOW_BEAM_GROWTH_SPEED = 5    # px of width added per frame
-    RAINBOW_BEAM_HUE_STEP = 4        # degrees of hue advance per frame
-    RAINBOW_BEAM_SEGMENTS = 5        # number of rainbow color bands
-    RAINBOW_BEAM_SEGMENT_SHIFT = 20  # hue offset between adjacent bands
+    # Rainbow beam (blue powerup): port of the legacy effect.  While active,
+    # GameManager spawns one RainbowLaser per frame from the bottom-center.
+    # Each laser starts 1 px wide, grows to RAINBOW_BEAM_WIDTH at
+    # RAINBOW_BEAM_GROWTH_SPEED px/frame, and travels upward — the older lasers
+    # are wider and higher, naturally forming a cone.
+    RAINBOW_BEAM_DURATION = 5000        # ms the beam stays active
+    RAINBOW_BEAM_WIDTH = 600             # max width per laser slice (full screen)
+    RAINBOW_BEAM_HEIGHT = 20             # height per laser slice
+    RAINBOW_BEAM_GROWTH_SPEED = 5        # px of width added per frame per slice
+    RAINBOW_BEAM_HUE_STEP = 4            # degrees of hue advance per frame
+    RAINBOW_BEAM_SEGMENTS = 5            # number of rainbow color bands per slice
+    RAINBOW_BEAM_SEGMENT_SHIFT = 20      # hue offset between adjacent bands
+
+
+class ShieldSettings:
+    """Shield duration and CRT flash timing."""
+
+    DURATION_MS = 7000
+    WARNING_MS = 1000
+    FLASH_INTERVAL = 120
+    WARNING_FLASH_INTERVAL = 50
+    FLASH_ALPHA = 200
 
 
 class LaserSettings:

@@ -1923,3 +1923,289 @@ Implements powerup drops and effects for the two remaining alien colors.
     _handle_spawn_event: plays 'ufo' when spawned alien is blue
 **Why:** Wires all the new mechanics into the game loop while keeping GameManager light — drop logic stays in _try_spawn_powerup_drop, follow-up logic is its own method, beam spawning is a one-liner in _resolve_powerups_at_bottom.
 **Editor:** GitHub Copilot Claude Sonnet 4.6 via VS Code
+
+## 2026-05-06 — RainbowBeam rewritten as a cone polygon
+
+The original implementation was a growing horizontal bar (rectangle), which looked wrong. The legacy game achieved a cone effect via many rapidly-fired narrow lasers stacking up — each one starting thin and widening as it traveled, so the oldest/highest laser was the widest. Since Typing Hero fires a single beam, the cone is now drawn explicitly as a polygon.
+
+The new `RainbowBeam` tracks two y-positions: `top_y` (the leading/widest edge, sweeps upward from `HEIGHT` at `RAINBOW_BEAM_SPEED` px/frame) and `apex_y` (the narrow tip, stays pinned at `HEIGHT` until `top_y` clears the screen top, then also rises). Each frame `_rebuild()` creates a fresh `SRCALPHA` surface sized to the current cone span and draws 5 trapezoid segments — wider at the leading edge, narrower at the apex — with shifting hues across them. The sprite rect matches the surface bounds so `lasers.draw()` and `_resolve_laser_collisions` both work without changes. Total lifetime at speed=3: ~4.5 s.
+
+`RAINBOW_BEAM_HEIGHT` and `RAINBOW_BEAM_GROWTH_SPEED` removed from `PowerupSettings` (the cone approach ties growth to movement speed, making them redundant). `RAINBOW_BEAM_SPEED` changed from -1 to -3 so the leading edge sweeps the full screen in ~2.2 s.
+
+**File:** settings.py
+**Date and Time:** 2026-05-06 UTC
+**Lines (at time of edit):** PowerupSettings RAINBOW_BEAM block
+**Before:**
+    RAINBOW_BEAM_SPEED = -1
+    RAINBOW_BEAM_HEIGHT = 40
+    RAINBOW_BEAM_GROWTH_SPEED = 5
+    RAINBOW_BEAM_HUE_STEP = 4
+    RAINBOW_BEAM_SEGMENTS = 5
+    RAINBOW_BEAM_SEGMENT_SHIFT = 20
+**After:**
+    RAINBOW_BEAM_SPEED = -3
+    RAINBOW_BEAM_HUE_STEP = 4
+    RAINBOW_BEAM_SEGMENTS = 5
+    RAINBOW_BEAM_SEGMENT_SHIFT = 20
+    # RAINBOW_BEAM_HEIGHT and RAINBOW_BEAM_GROWTH_SPEED removed
+**Why:** Cone growth is implicit in the geometry (width ∝ distance from apex), so a separate growth-speed constant is redundant. HEIGHT was a per-sprite height for the old rectangular bar; the polygon has no fixed height.
+
+**File:** core/sprites.py
+**Date and Time:** 2026-05-06 UTC
+**Lines (at time of edit):** RainbowBeam class (full rewrite)
+**Before:**
+    Fixed-height rect; _grow() widens it; _animate_rainbow() fills rect segments horizontally.
+    Moved upward via pos_y float accumulator.
+**After:**
+    top_y / apex_y track the cone extents.
+    _half_width_at(y): returns cone half-width at screen y (proportional to distance from apex).
+    _rebuild(): creates a new SRCALPHA surface sized to current cone span; draws 5 trapezoid
+                segments with per-segment hue offsets; updates self.rect to match.
+    update(): advances top_y each frame; lifts apex_y once top_y < 0; calls _rebuild(); kills
+              when apex_y < 0.
+**Why:** Explicit polygon matches the visual intent. The collision rect (bounding box of the cone) is still used by _resolve_laser_collisions unchanged — slightly conservative near the edges but acceptable for gameplay.
+**Editor:** GitHub Copilot Claude Sonnet 4.6 via VS Code
+
+## 2026-05-06 — RainbowBeam reverted to legacy approach (RainbowLaser stack)
+
+The cone polygon implementation looked wrong (an isolated triangle floating up rather than a beam dissipating from the bottom), and the sound was wrong (one-shot powerup sting instead of a sustained blast).  Both are byproducts of trying to re-engineer the legacy effect when the legacy approach was already perfect: the cone is the natural emergent shape of many narrow lasers fired in rapid succession, each one starting thin and growing wider as it travels.  Older lasers (higher up) are wider, newer lasers (lower down) are still thin — the stack *is* the cone.
+
+`RainbowBeam` (cone polygon) replaced with `RainbowLaser` — a near-direct port of the legacy `Laser` with `should_grow=True` and `colors='rainbow'`.  Each slice starts 1 px wide at the bottom-center, grows to full screen width at 5 px/frame, and travels upward at the same speed as kill lasers.
+
+`GameManager._update_rainbow_beam()` runs every frame during gameplay: while `_rainbow_beam_until` is in the future, it adds a fresh `RainbowLaser` to `self.lasers` and calls `self.audio.play('hyper')`.  The `hyper` channel auto-cuts the previous play, so 120 fires/second produce a sustained hum rather than a stutter — same trick the legacy game used.  Duration: 5000 ms (matches legacy `RAINBOW_BEAM_DURATION`).
+
+**File:** settings.py
+**Date and Time:** 2026-05-06 UTC
+**Lines (at time of edit):** PowerupSettings RAINBOW_BEAM_* constants
+**Before:**
+    [PowerupSettings briefly reverted by user to the no-rainbow / no-burst baseline]
+**After:**
+    BURST_TYPE / RAINBOW_BEAM_TYPE / MAX_BURST_TIER / BURST_TIER1_DELAY_MS / BURST_TIER2_DELAYS_MS restored
+    RAINBOW_BEAM_DURATION = 5000
+    RAINBOW_BEAM_WIDTH = 600
+    RAINBOW_BEAM_HEIGHT = 20
+    RAINBOW_BEAM_GROWTH_SPEED = 5
+    RAINBOW_BEAM_HUE_STEP = 4
+    RAINBOW_BEAM_SEGMENTS = 5
+    RAINBOW_BEAM_SEGMENT_SHIFT = 20
+**Why:** Restores the burst/rainbow constants the user reverted alongside the polygon failure.  RAINBOW_BEAM_SPEED removed (each slice uses LaserSettings.SPEED so the beam matches kill-laser cadence).
+
+**File:** core/sprites.py
+**Date and Time:** 2026-05-06 UTC
+**Lines (at time of edit):** RainbowBeam class replaced with RainbowLaser
+**Before:**
+    class RainbowBeam:
+        # cone polygon: trapezoid segments, top_y/apex_y tracking
+**After:**
+    class RainbowLaser:
+        # one slice: 1 px starting width, grows to RAINBOW_BEAM_WIDTH at GROWTH_SPEED px/frame,
+        # travels upward at LaserSettings.SPEED, rebuilds surface as it grows,
+        # rainbow segments stacked vertically on each slice
+**Why:** Direct port of legacy Laser with should_grow=True + colors='rainbow' is the right approach.  The cone effect is emergent from spawning one per frame, not a property of any single sprite.
+
+**File:** main.py
+**Date and Time:** 2026-05-06 UTC
+**Lines (at time of edit):** import, __init__, _reset_run_state, _resolve_powerups_at_bottom, new _update_rainbow_beam, _update_playing
+**Before:**
+    from core.sprites import ... RainbowBeam
+    elif powerup.kind == PowerupSettings.RAINBOW_BEAM_TYPE:
+        self.lasers.add(RainbowBeam())
+        self.audio.play('powerup_weapon')
+**After:**
+    from core.sprites import ... RainbowLaser
+    self._rainbow_beam_until = 0  # added to __init__ and reset
+    elif powerup.kind == PowerupSettings.RAINBOW_BEAM_TYPE:
+        self._rainbow_beam_until = ticks + RAINBOW_BEAM_DURATION
+        self.audio.play('powerup_weapon')
+    def _update_rainbow_beam:
+        if ticks >= self._rainbow_beam_until: return
+        self.lasers.add(RainbowLaser())
+        self.audio.play('hyper')
+    _update_playing now calls _update_rainbow_beam each frame
+**Why:** The duration-based emitter is what produces both the cone and the sustained sound.  'powerup_weapon' still plays once on collection (the chime), then 'hyper' takes over for the 5-second blast.
+**Editor:** GitHub Copilot Claude Sonnet 4.6 via VS Code
+
+## 2026-05-06 18:00 UTC — Shield powerup + rainbow-star token + burst hyper SFX fix
+
+**File:** settings.py
+**Date and Time:** 2026-05-06 18:00 UTC
+**Lines (at time of edit):** 74, 153, 158, 185-192 (modified)
+**Before:**
+    TV = os.path.join(GRAPHICS_DIR, 'tv.png')
+    TV_RED = os.path.join(GRAPHICS_DIR, 'tv_red.png')
+    TV_WHITE = os.path.join(GRAPHICS_DIR, 'tv_white.png')
+
+    HEART_TYPE = 'heal'
+    LASER_UPGRADE_TYPE = 'laser_upgrade'
+    BURST_TYPE = 'burst'
+    RAINBOW_BEAM_TYPE = 'rainbow_beam'
+**After:**
+    TV = os.path.join(GRAPHICS_DIR, 'tv.png')
+    TV_BLUE = os.path.join(GRAPHICS_DIR, 'tv_blue.png')
+    TV_RED = os.path.join(GRAPHICS_DIR, 'tv_red.png')
+    TV_WHITE = os.path.join(GRAPHICS_DIR, 'tv_white.png')
+
+    HEART_TYPE = 'heal'
+    SHIELD_TYPE = 'shield'
+    LASER_UPGRADE_TYPE = 'laser_upgrade'
+    BURST_TYPE = 'burst'
+    RAINBOW_BEAM_TYPE = 'rainbow_beam'
+    SHIELD_DROP_CHANCE = 0.20
+
+    class ShieldSettings:
+        DURATION_MS = 7000
+        WARNING_MS = 1000
+        FLASH_INTERVAL = 120
+        WARNING_FLASH_INTERVAL = 50
+        FLASH_ALPHA = 200
+**Why:** Centralized all new shield and overlay constants in `settings.py` per project refactoring rules (no magic numbers), and added the `tv_blue.png` path needed for the shield flash effect.
+**Editor:** GitHub Copilot GPT-5.3-Codex via VS Code
+
+**File:** ui/crt.py
+**Date and Time:** 2026-05-06 18:00 UTC
+**Lines (at time of edit):** 16-17, 55-62 (modified)
+**Before:**
+    self.tv_red = pygame.image.load(AssetPaths.TV_RED).convert_alpha()
+    self.tv_white = pygame.image.load(AssetPaths.TV_WHITE).convert_alpha()
+
+    def draw_damage_flash(self, show_red: bool) -> None:
+        overlay = self.tv_red if show_red else self.tv_white
+**After:**
+    self.tv_blue = pygame.image.load(AssetPaths.TV_BLUE).convert_alpha()
+    self.tv_red = pygame.image.load(AssetPaths.TV_RED).convert_alpha()
+    self.tv_white = pygame.image.load(AssetPaths.TV_WHITE).convert_alpha()
+
+    def draw_damage_flash(self, show_red: bool) -> None:
+        overlay = self.tv_red if show_red else self.tv_white
+
+    def draw_shield_flash(self, show_blue: bool) -> None:
+        overlay = self.tv_blue if show_blue else self.tv_white
+        overlay.set_alpha(ShieldSettings.FLASH_ALPHA)
+**Why:** Added a dedicated CRT overlay path for shield visuals so shield feedback uses blue/white flashing without interfering with existing red/white damage flash behavior.
+**Editor:** GitHub Copilot GPT-5.3-Codex via VS Code
+
+**File:** core/sprites.py
+**Date and Time:** 2026-05-06 18:00 UTC
+**Lines (at time of edit):** 215-327 (modified)
+**Before:**
+    if self.kind == PowerupSettings.BURST_TYPE:
+        self._draw_yellow_diamond()
+    elif self.kind == PowerupSettings.RAINBOW_BEAM_TYPE:
+        self._draw_blue_diamond()
+    else:
+        self._draw_green_diamond()
+
+    def _draw_blue_diamond(self):
+        """Render the blue rainbow-beam token as a wider, flatter diamond."""
+**After:**
+    if self.kind == PowerupSettings.BURST_TYPE:
+        self._draw_yellow_diamond()
+    elif self.kind == PowerupSettings.SHIELD_TYPE:
+        self._draw_shield_circle()
+    elif self.kind == PowerupSettings.RAINBOW_BEAM_TYPE:
+        self._draw_rainbow_star()
+    else:
+        self._draw_green_diamond()
+
+    def _draw_shield_circle(self):
+        """Render the shield token as a blue circle with a white outline."""
+
+    def _draw_rainbow_star(self):
+        """Render the rainbow-beam token as a flashing rainbow star."""
+
+    def _animate(self):
+        """Advance token-only animation frames for animated powerups."""
+**Why:** Replaced the flat blue diamond with a flashing rainbow star for the blue weapon drop, and added the blue circle shield drop art for red-alien shield drops.
+**Editor:** GitHub Copilot GPT-5.3-Codex via VS Code
+
+**File:** main.py
+**Date and Time:** 2026-05-06 18:00 UTC
+**Lines (at time of edit):** 21, 80, 123, 140-162, 260-320, 335-353, 372-374, 577-595, 617-623, 704-713 (modified)
+**Before:**
+    self._spawn_shot_lasers(targeted_alien)
+    if self.laser_level >= PowerupSettings.MAX_LASER_LEVEL:
+        self.audio.play('hyper')
+    else:
+        self.audio.play('laser')
+
+    if alien.color == 'red':
+        if self.hearts >= HeartSettings.MAX:
+            return
+        if random.random() < AlienSettings.DROP_CHANCE['red']:
+            self.powerups.add(PowerUp(..., PowerupSettings.HEART_TYPE))
+
+    for fire_at, alien in self._pending_follow_ups:
+        ...
+        if alien in self.aliens:
+            self._spawn_shot_lasers(alien)
+            self.audio.play('laser')
+
+    alien.kill()
+    self._apply_miss_penalty(alien.color)
+**After:**
+    self._spawn_shot_lasers(targeted_alien)
+    self._play_shot_sound()
+
+    if alien.color == 'red':
+        if (not self._shield_is_active() and random.random() < PowerupSettings.SHIELD_DROP_CHANCE):
+            self.powerups.add(PowerUp(..., PowerupSettings.SHIELD_TYPE))
+            return
+        if self.hearts < HeartSettings.MAX and random.random() < AlienSettings.DROP_CHANCE['red']:
+            self.powerups.add(PowerUp(..., PowerupSettings.HEART_TYPE))
+
+    elif powerup.kind == PowerupSettings.SHIELD_TYPE:
+        self._shield_until = pygame.time.get_ticks() + ShieldSettings.DURATION_MS
+        self.audio.play('powerup_weapon')
+
+    if alien in self.aliens:
+        self._spawn_shot_lasers(alien)
+        self._play_shot_sound()
+
+    if self._shield_is_active():
+        self._apply_shield_bottom_kill(alien)
+        continue
+
+    if self.state == 'playing' and self._shield_is_active():
+        ...
+        self.crt.draw_shield_flash(show_blue)
+**Why:** Implemented shield gameplay end-to-end (drop, activation, immunity, timed flash warning, and bottom-hit conversion to kills), and fixed burst follow-up SFX so hyper plays on all three shots when max laser is active.
+**Editor:** GitHub Copilot GPT-5.3-Codex via VS Code
+
+## 2026-05-06 18:06 UTC — Shield overlay stays solid blue until warning phase
+
+**File:** main.py
+**Date and Time:** 2026-05-06 18:06 UTC
+**Lines (at time of edit):** 703-712 (modified)
+**Before:**
+    if self.state == 'playing' and self._shield_is_active():
+        shield_elapsed = ShieldSettings.DURATION_MS - (self._shield_until - pygame.time.get_ticks())
+        warning_window = (self._shield_until - pygame.time.get_ticks()) <= ShieldSettings.WARNING_MS
+        interval = (
+            ShieldSettings.WARNING_FLASH_INTERVAL
+            if warning_window
+            else ShieldSettings.FLASH_INTERVAL
+        )
+        show_blue = (shield_elapsed // interval) % 2 == 0
+        self.crt.draw_shield_flash(show_blue)
+**After:**
+    if self.state == 'playing' and self._shield_is_active():
+        shield_time_left = self._shield_until - pygame.time.get_ticks()
+        if shield_time_left <= ShieldSettings.WARNING_MS:
+            show_blue = (
+                (shield_time_left // ShieldSettings.WARNING_FLASH_INTERVAL) % 2
+            ) == 0
+        else:
+            show_blue = True
+        self.crt.draw_shield_flash(show_blue)
+**Why:** Regular shield flashing felt visually rough even after slowing it down, so normal shield time now renders as a steady solid blue overlay. Only the final warning window flashes (fast) to preserve the expiration cue.
+**Editor:** GitHub Copilot GPT-5.3-Codex via VS Code
+
+**File:** docs/TODO.md
+**Date and Time:** 2026-05-06 18:06 UTC
+**Lines (at time of edit):** 98 (modified)
+**Before:**
+    [No note existed for improving the shield's normal-phase visual transition.]
+**After:**
+    - Replace the current normal shield overlay (solid blue) with a smoother fade/transition effect; keep fast end-of-duration flashing behavior.
+**Why:** Captures the requested follow-up polish item so we can revisit a nicer slow-phase shield transition later without losing the decision made for this pass.
+**Editor:** GitHub Copilot GPT-5.3-Codex via VS Code
