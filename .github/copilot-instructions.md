@@ -3,6 +3,7 @@
 ## Before making any change
 1. Read `docs/CHANGELOG.md` to understand the current state of the codebase.
 2. Read `docs/TESTING.md` and follow every rule under **Refactoring Rules**.
+3. Questions about why code was written a certain way are requests for explanation, not requests for code changes. Do not modify code unless the user explicitly asks for a change.
 
 ## After making any change
 - Append an entry to `docs/CHANGELOG.md` following the exact format specified in that file (ISO 8601 timestamp with timezone, file path, line numbers at time of edit, before/after code, why, and editor name including the AI model used).

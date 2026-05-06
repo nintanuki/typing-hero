@@ -218,6 +218,77 @@ First code lands in Typing Hero. This entry covers Stage 0 of the build plan in 
 **Why:** TODO Stage 0 step 4. Smallest possible main loop — open display, pump events, fill screen, flip, tick. Deliberately not ported from `legacy/main.py` (which is full of shooter-specific event handlers); the new `main.py` will grow stage-by-stage rather than start from a bloated copy. ESC quits the window cleanly here, matching the Stage 0 smoke test in `docs/TESTING.md`; this differs from legacy where ESC was a hard process kill — the gentler behavior is what Stage 9's pause work is going to want anyway.
 **Editor:** Claude Opus 4.7 via Cowork
 
+## 2026-05-06 11:24 UTC — Main loop moved into GameManager
+
+**File:** main.py
+**Date and Time:** 2026-05-06 11:24 UTC
+**Lines (at time of edit):** 1-551 (modified)
+**Before:**
+    def run() -> None:
+        pygame.init()
+        ...
+        while running:
+            for event in pygame.event.get():
+                ...
+
+    def _start_game(aliens, word_manager, spawn_director, audio, bg_group, powerups):
+        ...
+**After:**
+    class GameManager:
+        # -------------------------
+        # BOOT / LIFECYCLE
+        # -------------------------
+        def __init__(self) -> None:
+            ...
+
+        # -------------------------
+        # EVENT HANDLING
+        # -------------------------
+        def _handle_keydown(self, event: pygame.event.Event) -> None:
+            ...
+
+        def run(self) -> None:
+            while self.running:
+                self._handle_events()
+                self._update(delta_time)
+                self._draw()
+
+    def run() -> None:
+        GameManager().run()
+**Why:** Consolidated the runtime state and helper functions into a `GameManager` so `main.py` is organized around one owning abstraction instead of a procedural loop with a long list of free functions and shared locals. The refactor also adds explicit section separators, type hints, and argument/return docstring coverage where applicable, while keeping the module-level `run()` as the thin entrypoint at the bottom per the refactoring rules.
+**Editor:** GitHub Copilot Claude Sonnet 4.6 via VS Code
+
+## 2026-05-06 11:36 UTC — Remove GameState alias and module-level run() middleman
+
+**File:** main.py
+**Date and Time:** 2026-05-06 11:36 UTC
+**Lines (at time of edit):** 1-551 (modified)
+**Before:**
+    GameState = Literal['intro', 'playing', 'paused', 'game_over']
+
+    class GameManager:
+        ...
+        self.state: GameState = 'intro'
+        ...
+
+    def run() -> None:
+        GameManager().run()
+
+    if __name__ == "__main__":
+        run()
+        sys.exit(0)
+**After:**
+    class GameManager:
+        ...
+        self.state: Literal['intro', 'playing', 'paused', 'game_over'] = 'intro'
+        ...
+
+    if __name__ == "__main__":
+        GameManager().run()
+        sys.exit(0)
+**Why:** The `GameState` alias was only used in one annotation so a dedicated alias added indirection without benefit; inlining the `Literal` is cleaner. The module-level `run()` was a pure middleman (it only called `GameManager().run()`) which violates the refactoring rule that A should call C directly when B does nothing else.
+**Editor:** GitHub Copilot Claude Sonnet 4.6 via VS Code
+
 ## 2026-05-03 05:50 UTC — TODO checkboxes + Stage 0 marked complete
 
 Audit pass over the Stage 0 deliverables. Everything required by the TODO already existed on disk (assets copied, package `__init__.py` files in place, `settings.py` exposing the five required classes, `main.py` opening a 600×800 window with QUIT/ESC handling), so no game code changed in this entry. The TODO itself was reformatted to use GitHub-style task checkboxes for every stage and step so future sessions can see at a glance what is and isn't done, and Stage 0's boxes were ticked.
