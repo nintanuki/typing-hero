@@ -25,7 +25,7 @@ class SpawnDirector:
         in_use = {alien.word for alien in aliens}
         word = word_manager.pick_word(in_use, level)
         if word is None:
-            return
+            return None
 
         color = random.choices(
             SpawnSettings.COLORS,
@@ -36,7 +36,9 @@ class SpawnDirector:
             SpawnSettings.X_MARGIN,
             ScreenSettings.WIDTH - SpawnSettings.X_MARGIN,
         )
-        aliens.add(Alien(color=color, pos=(x, SpawnSettings.SPAWN_Y), word=word))
+        alien = Alien(color=color, pos=(x, SpawnSettings.SPAWN_Y), word=word)
+        aliens.add(alien)
+        return alien
 
     def adjust_difficulty(self, score):
         """Apply level-based spawn timing and alien speed multiplier.

@@ -1849,3 +1849,77 @@ Bottom-hit damage now mirrors the original rule more closely: if the player curr
     )[0]
 **Why:** Spawn selection now uses the configured weighted probability table instead of equal probability for every color.
 **Editor:** GitHub Copilot GPT-5.3-Codex via VS Code
+
+## 2026-05-06 — Yellow and blue powerups (burst fire + rainbow beam), UFO sound on blue spawn
+
+Implements powerup drops and effects for the two remaining alien colors.
+
+**Yellow — burst fire:** killing a yellow alien can drop a yellow diamond powerup.  Collecting a tier-1 burst token causes each completed word to fire one extra laser at a 250 ms delay after the primary shot.  Collecting a tier-2 token causes two follow-up shots (at 200 ms and 400 ms, slightly faster than tier 1 to "feel" like a faster burst).  Follow-up shots re-run the predictive-intercept calculation at the moment they fire, so they act as genuine backups if the primary shot missed a zigzagging alien; if the alien was already killed by the primary shot the follow-up is silently dropped.
+
+**Blue — rainbow beam:** killing a blue alien can drop a wide flat blue diamond powerup.  Collecting it fires a single `RainbowBeam` sprite from the bottom-center of the screen.  The beam starts 1 px wide and grows to full screen width at 5 px/frame (~1 s), drifts slowly upward (-1 px/frame, ~6.7 s total traverse), cycles rainbow colors across 5 hue-shifted segments, and destroys every alien it overlaps exactly once.  The same `_resolve_laser_collisions` path that handles `KillLaser` handles `RainbowBeam` (both expose `is_piercing=True` and a `hit_aliens` set), so no separate collision code was needed.
+
+**UFO sound:** `spawn_director.spawn()` now returns the newly created alien (or `None`).  `GameManager._handle_spawn_event` and `_reset_run_state` both play `audio.play('ufo')` (backed by `sfx_sound_bling.ogg`, matching the legacy binding) when the returned alien is blue.
+
+**File:** settings.py
+**Date and Time:** 2026-05-06 UTC
+**Lines (at time of edit):** 148-165 (PowerupSettings extended)
+**Before:**
+    HEART_TYPE = 'heal'
+    LASER_UPGRADE_TYPE = 'laser_upgrade'
+    TWIN_BEAM_OFFSET = 12
+    MAX_LASER_LEVEL = 3
+**After:**
+    HEART_TYPE / LASER_UPGRADE_TYPE / BURST_TYPE / RAINBOW_BEAM_TYPE added.
+    MAX_BURST_TIER = 2
+    BURST_TIER1_DELAY_MS = 250
+    BURST_TIER2_DELAYS_MS = (200, 400)
+    RAINBOW_BEAM_SPEED / HEIGHT / GROWTH_SPEED / HUE_STEP / SEGMENTS / SEGMENT_SHIFT added.
+**Why:** All new gameplay constants go in settings.py per refactoring rules; no magic numbers in sprites or main.
+
+**File:** core/sprites.py
+**Date and Time:** 2026-05-06 UTC
+**Lines (at time of edit):** 125-230 (new RainbowBeam class; PowerUp extended)
+**Before:**
+    class PowerUp:
+        def __init__(self, pos, kind):
+            ...  # only HEART_TYPE and LASER_UPGRADE_TYPE handled
+        def _draw_green_diamond(self): ...
+**After:**
+    class RainbowBeam(pygame.sprite.Sprite):
+        # new: slow expanding rainbow beam from bottom-center
+    class PowerUp:
+        def __init__: dispatches to _draw_yellow_diamond / _draw_blue_diamond / _draw_green_diamond
+        _draw_yellow_diamond / _draw_blue_diamond added alongside existing _draw_green_diamond
+**Why:** RainbowBeam needs its own growth + rainbow-animation logic not present in KillLaser. PowerUp needed two new visual shapes for the new drop types.
+
+**File:** systems/spawn_director.py
+**Date and Time:** 2026-05-06 UTC
+**Lines (at time of edit):** 30-43 (spawn method)
+**Before:**
+    aliens.add(Alien(...))
+    # implicit return None
+**After:**
+    alien = Alien(...)
+    aliens.add(alien)
+    return alien   # None returned on skip
+**Why:** Callers need the alien reference to play the UFO sound when color == 'blue'.
+
+**File:** main.py
+**Date and Time:** 2026-05-06 UTC
+**Lines (at time of edit):** various (import, __init__, _reset_run_state, _resolve_completed_word, _try_spawn_powerup_drop, _resolve_powerups_at_bottom, _handle_spawn_event, new _update_follow_up_shots)
+**Before:**
+    from core.sprites import Alien, KillLaser, PowerUp
+    # no burst_tier, no _pending_follow_ups
+    # _try_spawn_powerup_drop: only red and green handled
+    # _resolve_powerups_at_bottom: only heart and laser_upgrade handled
+    # _handle_spawn_event: spawn() return value ignored
+**After:**
+    from core.sprites import Alien, KillLaser, PowerUp, RainbowBeam
+    burst_tier: int and _pending_follow_ups: list added to __init__ and reset
+    _resolve_completed_word: queues follow-up shots when burst_tier >= 1
+    _update_follow_up_shots: fires queued shots when their delay elapses
+    _try_spawn_powerup_drop: yellow/blue drop cases added
+    _resolve_powerups_at_bottom: burst and rainbow_beam collection handling added
+    _handle_spawn_event: plays 'ufo' when spawned alien is blue
+**Why:** Wires all the new mechanics into the game loop while keeping GameManager light — drop logic stays in _try_spawn_powerup_drop, follow-up logic is its own method, beam spawning is a one-liner in _resolve_powerups_at_bottom.
+**Editor:** GitHub Copilot Claude Sonnet 4.6 via VS Code

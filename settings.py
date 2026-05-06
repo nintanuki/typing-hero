@@ -150,10 +150,30 @@ class PowerupSettings:
 
     HEART_TYPE = 'heal'
     LASER_UPGRADE_TYPE = 'laser_upgrade'
+    BURST_TYPE = 'burst'
+    RAINBOW_BEAM_TYPE = 'rainbow_beam'
     TWIN_BEAM_OFFSET = 12
 
     # Laser modes: 1=single, 2=twin, 3=twin+piercing.
     MAX_LASER_LEVEL = 3
+
+    # Burst fire (yellow powerup): each completed word fires 1 + tier_level lasers.
+    # Tier 1: one follow-up at BURST_TIER1_DELAY_MS after the primary shot.
+    # Tier 2: two follow-ups at the BURST_TIER2_DELAYS_MS intervals (shorter gap
+    #         between them so the salvo feels faster than tier 1).
+    MAX_BURST_TIER = 2
+    BURST_TIER1_DELAY_MS = 250
+    BURST_TIER2_DELAYS_MS = (200, 400)
+
+    # Rainbow beam (blue powerup): a slow wide expanding beam fired from the
+    # bottom-center.  Starts 1 px wide, grows to full screen width at
+    # RAINBOW_BEAM_GROWTH_SPEED px/frame, then drifts upward until off-screen.
+    RAINBOW_BEAM_SPEED = -1          # px per frame (slow enough to sweep ~6 s)
+    RAINBOW_BEAM_HEIGHT = 40         # sprite height in px
+    RAINBOW_BEAM_GROWTH_SPEED = 5    # px of width added per frame
+    RAINBOW_BEAM_HUE_STEP = 4        # degrees of hue advance per frame
+    RAINBOW_BEAM_SEGMENTS = 5        # number of rainbow color bands
+    RAINBOW_BEAM_SEGMENT_SHIFT = 20  # hue offset between adjacent bands
 
 
 class LaserSettings:

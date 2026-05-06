@@ -9,7 +9,7 @@ from typing import Literal
 import pygame
 
 from core.animations import Background, Explosion
-from core.sprites import Alien, KillLaser, PowerUp
+from core.sprites import Alien, KillLaser, PowerUp, RainbowBeam
 from settings import (
     AlienSettings,
     DamageSettings,
@@ -69,6 +69,8 @@ class GameManager:
 
         self.hearts = HeartSettings.MAX
         self.laser_level = 1
+        self.burst_tier = 0
+        self._pending_follow_ups: list = []  # (fire_at_ticks, alien_ref)
         self.current_level = 1
         self._invincible_until = 0   # ticks when invincibility expires
         self._flash_start = 0        # ticks when the current damage flash began
@@ -108,6 +110,8 @@ class GameManager:
         self.scores.reset()
         self.hearts = HeartSettings.MAX
         self.laser_level = 1
+        self.burst_tier = 0
+        self._pending_follow_ups = []
         self.current_level = 1
         self._invincible_until = 0
         self._flash_start = 0
@@ -117,7 +121,9 @@ class GameManager:
         self.audio.stop_bgm()
         self.spawn_director.adjust_difficulty(0)
         self.spawn_director.sync_background_speed(self.bg_group, 0)
-        self.spawn_director.spawn(self.aliens, self.word_manager, 0)
+        spawned = self.spawn_director.spawn(self.aliens, self.word_manager, 0)
+        if spawned is not None and spawned.color == 'blue':
+            self.audio.play('ufo')
         self.audio.ensure_bgm_playing()
 
     def _handle_spacebar_playing(self) -> None:
@@ -134,6 +140,16 @@ class GameManager:
             self.audio.play('hyper')
         else:
             self.audio.play('laser')
+
+        if self.burst_tier >= 1:
+            now = pygame.time.get_ticks()
+            delays = (
+                PowerupSettings.BURST_TIER2_DELAYS_MS
+                if self.burst_tier >= 2
+                else (PowerupSettings.BURST_TIER1_DELAY_MS,)
+            )
+            for delay in delays:
+                self._pending_follow_ups.append((now + delay, targeted_alien))
 
     def _spawn_shot_lasers(self, targeted_alien: Alien) -> None:
         """Spawn the current laser loadout aimed at the resolved alien.
@@ -253,6 +269,22 @@ class GameManager:
                         PowerupSettings.LASER_UPGRADE_TYPE,
                     )
                 )
+            return
+
+        if alien.color == 'yellow':
+            if self.burst_tier >= PowerupSettings.MAX_BURST_TIER:
+                return
+            if random.random() < AlienSettings.DROP_CHANCE['yellow']:
+                self.powerups.add(
+                    PowerUp(alien.rect.center, PowerupSettings.BURST_TYPE)
+                )
+            return
+
+        if alien.color == 'blue':
+            if random.random() < AlienSettings.DROP_CHANCE['blue']:
+                self.powerups.add(
+                    PowerUp(alien.rect.center, PowerupSettings.RAINBOW_BEAM_TYPE)
+                )
 
     def _resolve_powerups_at_bottom(self) -> None:
         """Apply powerup effects once drops reach the bottom edge."""
@@ -271,6 +303,13 @@ class GameManager:
                         self.audio.play('hyper')
                     else:
                         self.audio.play('powerup_twin')
+            elif powerup.kind == PowerupSettings.BURST_TYPE:
+                if self.burst_tier < PowerupSettings.MAX_BURST_TIER:
+                    self.burst_tier += 1
+                    self.audio.play('powerup_twin')
+            elif powerup.kind == PowerupSettings.RAINBOW_BEAM_TYPE:
+                self.lasers.add(RainbowBeam())
+                self.audio.play('powerup_weapon')
 
             powerup.kill()
 
@@ -469,21 +508,45 @@ class GameManager:
     def _handle_spawn_event(self) -> None:
         """Spawn a new alien when the gameplay timer fires."""
         if self.state == 'playing':
-            self.spawn_director.spawn(
+            spawned = self.spawn_director.spawn(
                 self.aliens,
                 self.word_manager,
                 self.scores.score,
             )
+            if spawned is not None and spawned.color == 'blue':
+                self.audio.play('ufo')
 
     # -------------------------
     # PER-FRAME UPDATE / RENDER
     # -------------------------
+
+    def _update_follow_up_shots(self) -> None:
+        """Fire any burst follow-up shots whose delay has elapsed.
+
+        Each queued shot fires at the alien's predicted position at the
+        moment it fires (fresh calculation), so it acts as a genuine
+        backup if the primary shot missed.  If the alien is already dead
+        the follow-up is silently dropped.
+        """
+        if not self._pending_follow_ups:
+            return
+        now = pygame.time.get_ticks()
+        remaining = []
+        for fire_at, alien in self._pending_follow_ups:
+            if now < fire_at:
+                remaining.append((fire_at, alien))
+                continue
+            if alien in self.aliens:
+                self._spawn_shot_lasers(alien)
+                self.audio.play('laser')
+        self._pending_follow_ups = remaining
 
     def _update_playing(self) -> None:
         """Advance gameplay-only sprite state and resolve gameplay outcomes."""
         self.audio.ensure_bgm_playing()
         self.aliens.update()
         self.lasers.update()
+        self._update_follow_up_shots()
         self._resolve_laser_collisions()
         self.explosions.update()
         self.powerups.update()

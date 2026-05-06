@@ -145,6 +145,73 @@ class KillLaser(pygame.sprite.Sprite):
             self.kill()
 
 
+class RainbowBeam(pygame.sprite.Sprite):
+    """A slow wide expanding beam fired from the bottom-center of the screen.
+
+    Starts 1 px wide and grows to full screen width over ~1 second while drifting
+    upward.  Any alien the beam overlaps is destroyed once.
+    """
+
+    def __init__(self):
+        """Spawn at the bottom-center of the screen with a 1-pixel starting width."""
+        super().__init__()
+        self.is_piercing = True
+        self.hit_aliens = set()
+        self.hue = 0
+        self.current_width = 1
+        self.target_width = ScreenSettings.WIDTH
+        self.image = pygame.Surface(
+            (self.current_width, PowerupSettings.RAINBOW_BEAM_HEIGHT)
+        )
+        self.image.fill((255, 255, 255))
+        self.rect = self.image.get_rect(
+            midbottom=(ScreenSettings.WIDTH // 2, ScreenSettings.HEIGHT)
+        )
+        self.pos_y = float(self.rect.y)
+
+    def _rebuild_surface(self):
+        """Recreate the surface at the new width, preserving vertical position."""
+        self.image = pygame.Surface(
+            (self.current_width, PowerupSettings.RAINBOW_BEAM_HEIGHT)
+        )
+        self.rect = self.image.get_rect(
+            midtop=(ScreenSettings.WIDTH // 2, round(self.pos_y))
+        )
+
+    def _grow(self):
+        """Widen the beam by RAINBOW_BEAM_GROWTH_SPEED px until target width is reached."""
+        if self.current_width < self.target_width:
+            self.current_width = min(
+                self.target_width,
+                self.current_width + PowerupSettings.RAINBOW_BEAM_GROWTH_SPEED,
+            )
+            self._rebuild_surface()
+
+    def _animate_rainbow(self):
+        """Advance the hue and fill the beam surface with shifting rainbow segments."""
+        self.hue = (self.hue + PowerupSettings.RAINBOW_BEAM_HUE_STEP) % 360
+        segment_height = (
+            PowerupSettings.RAINBOW_BEAM_HEIGHT // PowerupSettings.RAINBOW_BEAM_SEGMENTS
+        )
+        for i in range(PowerupSettings.RAINBOW_BEAM_SEGMENTS):
+            seg_hue = (self.hue + i * PowerupSettings.RAINBOW_BEAM_SEGMENT_SHIFT) % 360
+            color = pygame.Color(0)
+            color.hsva = (seg_hue, 100, 100, 100)
+            seg_rect = pygame.Rect(
+                0, i * segment_height, self.current_width, segment_height
+            )
+            self.image.fill(color, seg_rect)
+
+    def update(self):
+        """Grow, animate, drift upward one frame, and self-destruct when off-screen."""
+        self._grow()
+        self._animate_rainbow()
+        self.pos_y += PowerupSettings.RAINBOW_BEAM_SPEED
+        self.rect.y = round(self.pos_y)
+        if self.rect.bottom < 0:
+            self.kill()
+
+
 class PowerUp(pygame.sprite.Sprite):
     """A falling powerup that triggers once it reaches the bottom of the screen."""
 
@@ -159,11 +226,16 @@ class PowerUp(pygame.sprite.Sprite):
 
         diameter = PowerupSettings.RADIUS * 2
         self.image = pygame.Surface((diameter, diameter), pygame.SRCALPHA)
-        self._draw_green_diamond()
+        if self.kind == PowerupSettings.BURST_TYPE:
+            self._draw_yellow_diamond()
+        elif self.kind == PowerupSettings.RAINBOW_BEAM_TYPE:
+            self._draw_blue_diamond()
+        else:
+            self._draw_green_diamond()
         self.rect = self.image.get_rect(center=pos)
 
     def _draw_green_diamond(self):
-        """Render the green upgrade token as a small filled diamond."""
+        """Render the green laser-upgrade token as a small filled diamond."""
         radius = PowerupSettings.RADIUS
         points = [
             (radius, 0),
@@ -172,6 +244,31 @@ class PowerUp(pygame.sprite.Sprite):
             (0, radius),
         ]
         pygame.draw.polygon(self.image, ColorSettings.COLORS['GREEN'], points)
+        pygame.draw.polygon(self.image, ColorSettings.COLORS['WHITE'], points, width=2)
+
+    def _draw_yellow_diamond(self):
+        """Render the yellow burst token as a small filled diamond."""
+        radius = PowerupSettings.RADIUS
+        points = [
+            (radius, 0),
+            (radius * 2, radius),
+            (radius, radius * 2),
+            (0, radius),
+        ]
+        pygame.draw.polygon(self.image, ColorSettings.COLORS['YELLOW'], points)
+        pygame.draw.polygon(self.image, ColorSettings.COLORS['WHITE'], points, width=2)
+
+    def _draw_blue_diamond(self):
+        """Render the blue rainbow-beam token as a wider, flatter diamond."""
+        # A flatter (wider) diamond distinguishes it visually from the other tokens.
+        r = PowerupSettings.RADIUS
+        points = [
+            (r, 4),
+            (r * 2, r),
+            (r, r * 2 - 4),
+            (0, r),
+        ]
+        pygame.draw.polygon(self.image, ColorSettings.COLORS['BLUE'], points)
         pygame.draw.polygon(self.image, ColorSettings.COLORS['WHITE'], points, width=2)
 
     def update(self):
