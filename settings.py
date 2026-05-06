@@ -187,8 +187,8 @@ class ShieldSettings:
 
     DURATION_MS = 7000
     WARNING_MS = 1000
-    FLASH_INTERVAL = 120
-    WARNING_FLASH_INTERVAL = 50
+    FLASH_INTERVAL = 120 # not used until we can make this look nicer?
+    WARNING_FLASH_INTERVAL = 25
     FLASH_ALPHA = 200
 
 
