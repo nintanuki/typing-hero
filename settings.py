@@ -155,7 +155,7 @@ class PowerupSettings:
     BURST_TYPE = 'burst'
     RAINBOW_BEAM_TYPE = 'rainbow_beam'
     TWIN_BEAM_OFFSET = 12
-    SHIELD_DROP_CHANCE = 1.10
+    SHIELD_DROP_CHANCE = 0.10
 
     # Laser modes: 1=single, 2=twin, 3=twin+piercing.
     MAX_LASER_LEVEL = 3
@@ -188,13 +188,13 @@ class ShieldSettings:
     DURATION_MS = 7000
     WARNING_MS = 1000
     WARNING_FLASH_INTERVAL = 25
-    # Base alpha for the blue vignette layer that's always visible while shielded.
+    # Base alpha for the white vignette layer that's always visible while shielded.
     FLASH_ALPHA = 200
-    # Sinusoidal crossfade between blue and white. PULSE_PERIOD_MS controls
-    # how long one full blue->white->blue cycle takes; PULSE_WHITE_ALPHA_MAX
-    # caps how white the wash gets at the peak of the pulse.
-    PULSE_PERIOD_MS = 1400
-    PULSE_WHITE_ALPHA_MAX = 200
+    # Sinusoidal crossfade between white and blue. PULSE_PERIOD_MS controls
+    # how long one full white->blue->white cycle takes; PULSE_BLUE_ALPHA_MAX
+    # caps how blue the wash gets at the peak of the pulse.
+    PULSE_PERIOD_MS = 1000
+    PULSE_BLUE_ALPHA_MAX = 200
 
 
 class LaserSettings:

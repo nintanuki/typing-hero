@@ -2159,6 +2159,70 @@ The cone polygon implementation looked wrong (an isolated triangle floating up r
     TV = os.path.join(GRAPHICS_DIR, 'tv.png')
     TV_BLUE = os.path.join(GRAPHICS_DIR, 'tv_blue.png')
     TV_RED = os.path.join(GRAPHICS_DIR, 'tv_red.png')
+
+## 2026-05-07 21:20 UTC â€” Inverted shield pulse to white-base with blue pulse
+
+**File:** settings.py
+**Date and Time:** 2026-05-07 21:20 UTC
+**Lines (at time of edit):** 190-197 (modified)
+**Before:**
+    # Base alpha for the blue vignette layer that's always visible while shielded.
+    FLASH_ALPHA = 200
+    PULSE_PERIOD_MS = 1400
+    PULSE_WHITE_ALPHA_MAX = 200
+**After:**
+    # Base alpha for the white vignette layer that's always visible while shielded.
+    FLASH_ALPHA = 200
+    PULSE_PERIOD_MS = 1400
+    PULSE_BLUE_ALPHA_MAX = 200
+**Why:** The requested visual inversion needs a blue pulse amount, not a white pulse amount. Renaming the constant keeps shield tuning semantics aligned with the compositing direction.
+**Editor:** GPT-5.3-Codex via GitHub Copilot Chat in VS Code
+
+**File:** ui/crt.py
+**Date and Time:** 2026-05-07 21:20 UTC
+**Lines (at time of edit):** 55-72 (modified)
+**Before:**
+    def draw_shield_flash(self, white_alpha: int) -> None:
+        self.tv_blue.set_alpha(ShieldSettings.FLASH_ALPHA)
+        self.screen.blit(self.tv_blue, (0, 0))
+        if white_alpha > 0:
+            self.tv_white.set_alpha(white_alpha)
+            self.screen.blit(self.tv_white, (0, 0))
+**After:**
+    def draw_shield_flash(self, blue_alpha: int) -> None:
+        self.tv_white.set_alpha(ShieldSettings.FLASH_ALPHA)
+        self.screen.blit(self.tv_white, (0, 0))
+        if blue_alpha > 0:
+            self.tv_blue.set_alpha(blue_alpha)
+            self.screen.blit(self.tv_blue, (0, 0))
+**Why:** Inverting the pulse is achieved by swapping the base layer and pulsing layer: white remains constant and blue fades in/out on top.
+**Editor:** GPT-5.3-Codex via GitHub Copilot Chat in VS Code
+
+**File:** main.py
+**Date and Time:** 2026-05-07 21:20 UTC
+**Lines (at time of edit):** 5-7, 705-722 (modified)
+**Before:**
+    import random
+    import sys
+    import math
+
+    strobe_white = (...) != 0
+    white_alpha = ShieldSettings.PULSE_WHITE_ALPHA_MAX if strobe_white else 0
+    ...
+    white_alpha = int(ShieldSettings.PULSE_WHITE_ALPHA_MAX * wave)
+    self.crt.draw_shield_flash(white_alpha)
+**After:**
+    import math
+    import random
+    import sys
+
+    strobe_blue = (...) != 0
+    blue_alpha = ShieldSettings.PULSE_BLUE_ALPHA_MAX if strobe_blue else 0
+    ...
+    blue_alpha = int(ShieldSettings.PULSE_BLUE_ALPHA_MAX * wave)
+    self.crt.draw_shield_flash(blue_alpha)
+**Why:** The renderer now expects blue pulse intensity, so the gameplay draw path computes and passes blue alpha directly in both normal pulse and warning strobe phases.
+**Editor:** GPT-5.3-Codex via GitHub Copilot Chat in VS Code
     TV_WHITE = os.path.join(GRAPHICS_DIR, 'tv_white.png')
 
     HEART_TYPE = 'heal'
@@ -2362,7 +2426,7 @@ The cone polygon implementation looked wrong (an isolated triangle floating up r
 
 ---
 
-## 2026-05-07 21:00 UTC — Shield vignette pulses smoothly between blue and white
+## 2026-05-07 21:00 UTC ï¿½ Shield vignette pulses smoothly between blue and white
 
 Replaced the binary blue/white toggle on the active-shield CRT vignette with a sinusoidal crossfade so the overlay breathes between the two states instead of strobing. The blue vignette is now drawn as a constant base layer; a white vignette is composited on top with an alpha that rides a cosine wave (period configurable via ShieldSettings.PULSE_PERIOD_MS). The rapid-strobe warning during the final WARNING_MS of the shield is preserved by feeding a binary 0 / PULSE_WHITE_ALPHA_MAX alpha through the same path, so the urgency cue still reads as a hard flash.
 
@@ -2430,5 +2494,5 @@ Replaced the binary blue/white toggle on the active-shield CRT vignette with a s
         wave = (1 - math.cos(phase * 2 * math.pi)) / 2
         white_alpha = int(ShieldSettings.PULSE_WHITE_ALPHA_MAX * wave)
     self.crt.draw_shield_flash(white_alpha)
-**Why:** Used a raised cosine ((1 - cos(2p·phase)) / 2) because it eases through 0 and 1 cleanly — a triangle wave or bs(sin) produced visible `corners` at the extremes of the fade in test runs. Added import math to support it; kept the warning-strobe arithmetic identical so the end-of-shield warning reads the same as before.
+**Why:** Used a raised cosine ((1 - cos(2pï¿½phase)) / 2) because it eases through 0 and 1 cleanly ï¿½ a triangle wave or bs(sin) produced visible `corners` at the extremes of the fade in test runs. Added import math to support it; kept the warning-strobe arithmetic identical so the end-of-shield warning reads the same as before.
 **Editor:** Claude Opus 4.7 via GitHub Copilot Chat in VS Code
