@@ -52,12 +52,20 @@ class CRT:
         overlay.set_alpha(DamageSettings.FLASH_ALPHA)
         self.screen.blit(overlay, (0, 0))
 
-    def draw_shield_flash(self, show_blue: bool) -> None:
-        """Blit the shield vignette while the shield powerup is active.
+    def draw_shield_flash(self, white_alpha: int) -> None:
+        """Layer the blue vignette with a variable-alpha white wash on top.
+
+        The blue overlay is always blitted at the base shield alpha; the white
+        overlay sits on top with a caller-supplied alpha so the playfield can
+        either smoothly pulse (sinusoidal alpha) or rapidly strobe (binary
+        alpha) without the CRT layer needing to know which mode it's in.
 
         Args:
-            show_blue: True for the blue phase, False for the white phase.
+            white_alpha: 0-255 alpha for the white overlay; higher values fade
+                the vignette toward white. 0 leaves only the blue layer visible.
         """
-        overlay = self.tv_blue if show_blue else self.tv_white
-        overlay.set_alpha(ShieldSettings.FLASH_ALPHA)
-        self.screen.blit(overlay, (0, 0))
+        self.tv_blue.set_alpha(ShieldSettings.FLASH_ALPHA)
+        self.screen.blit(self.tv_blue, (0, 0))
+        if white_alpha > 0:
+            self.tv_white.set_alpha(white_alpha)
+            self.screen.blit(self.tv_white, (0, 0))
