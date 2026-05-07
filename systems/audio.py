@@ -183,9 +183,9 @@ class Audio:
         self.last_bgm = self.bg_music
 
     def play_intro_music(self) -> None:
-        """Start intro music if it isn't already playing."""
+        """Start looping intro music if it isn't already playing."""
         if not self.channels['intro_music'].get_busy():
-            self.channels['intro_music'].play(self.intro_music)
+            self.channels['intro_music'].play(self.intro_music, loops=-1)
 
     def stop_intro_music(self) -> None:
         """Halt intro music immediately."""

@@ -419,6 +419,24 @@ Stage 2 of the build plan lands: the player can now type letters into a buffer r
 **Why:** Q7 was the only Stage 2 question that needed a project-wide answer rather than a stage-local one — once we decide that the screen always shows caps, every future render has to obey, and the rule belongs in both the design-question section (so the decision is recorded) and the pitfalls section (so it's the first thing a future session sees when they grep §6 for gotchas). The Pixeled font is already chunky pixel-arcade, and uppercase reinforces that read; it also collapses an entire class of "user typed 'h' but the word starts with 'H'" matching bugs by making case irrelevant at compare time.
 **Editor:** Claude Opus 4.7 via Cowork
 
+## 2026-05-06 20:55 UTC — Loop intro music on title screen
+
+**File:** systems/audio.py
+**Date and Time:** 2026-05-06 20:55 UTC
+**Lines (at time of edit):** 185-188 (modified)
+**Before:**
+    def play_intro_music(self) -> None:
+        """Start intro music if it isn't already playing."""
+        if not self.channels['intro_music'].get_busy():
+            self.channels['intro_music'].play(self.intro_music)
+**After:**
+    def play_intro_music(self) -> None:
+        """Start looping intro music if it isn't already playing."""
+        if not self.channels['intro_music'].get_busy():
+            self.channels['intro_music'].play(self.intro_music, loops=-1)
+**Why:** Intro music was started as a one-shot sound, so it stopped after a single pass while remaining on the title screen. Using `loops=-1` keeps intro music playing continuously until the game explicitly calls `stop_intro_music()` when entering gameplay.
+**Editor:** GPT-5.3-Codex via GitHub Copilot Chat in VS Code
+
 **File:** docs/TODO.md
 **Date and Time:** 2026-05-03 05:59 UTC
 **Lines (at time of edit):** Stage 2 heading + 4 step boxes + new resolution paragraph
@@ -1959,6 +1977,104 @@ The new `RainbowBeam` tracks two y-positions: `top_y` (the leading/widest edge, 
 **After:**
     top_y / apex_y track the cone extents.
     _half_width_at(y): returns cone half-width at screen y (proportional to distance from apex).
+
+## 2026-05-06 20:49 UTC — Bottom-hit now clears non-shield powerups; shield remains fully invulnerable
+
+**File:** main.py
+**Date and Time:** 2026-05-06 20:49 UTC
+**Lines (at time of edit):** 346-392 and 613-621 (modified)
+**Before:**
+    def _apply_miss_penalty(self, alien_color: str) -> None:
+        ...
+        if self._shield_is_active():
+            return
+        ...
+        if self.laser_level > 1:
+            self.audio.play('alarm_med')
+            self.laser_level = 1
+            return
+
+    def _update_playing(self) -> None:
+        ...
+        if self._shield_is_active():
+            self._apply_shield_bottom_kill(alien)
+            continue
+        alien.kill()
+        self._apply_miss_penalty(alien.color)
+**After:**
+    def _clear_active_powerups(self) -> None:
+        self.laser_level = 1
+        self.burst_tier = 0
+        self._rainbow_beam_until = 0
+        self._shield_until = 0
+        self._pending_follow_ups = []
+
+    def _has_active_powerups(self) -> bool:
+        return (
+            self.laser_level > 1
+            or self.burst_tier > 0
+            or pygame.time.get_ticks() < self._rainbow_beam_until
+            or self._shield_is_active()
+        )
+
+    def _apply_miss_penalty(self, alien_color: str) -> None:
+        ...
+        if self._shield_is_active():
+            return
+        ...
+        if self._has_active_powerups():
+            self._clear_active_powerups()
+            return
+
+    def _update_playing(self) -> None:
+        ...
+        alien.kill()
+        self._apply_miss_penalty(alien.color)
+**Why:** Fixes the bottom-hit behavior so non-shield misses remove all active combat powerups (including yellow burst) instead of only stripping the green laser tier, while preserving full shield invulnerability exactly as designed: with shield active, misses do not consume hearts, powerups, or the shield timer, and no shield-loss SFX is emitted.
+**Editor:** GitHub Copilot GPT-5.3-Codex via VS Code
+
+## 2026-05-06 20:51 UTC — Narrow miss fix to green/yellow powerups and restore shield-bottom behavior
+
+**File:** main.py
+**Date and Time:** 2026-05-06 20:51 UTC
+**Lines (at time of edit):** 339-389 and 611-623 (modified)
+**Before:**
+    # _apply_shield_bottom_kill removed
+    def _apply_miss_penalty(self, alien_color: str) -> None:
+        ...
+        if self._has_active_powerups():
+            self._clear_active_powerups()
+            return
+
+    def _update_playing(self) -> None:
+        ...
+        alien.kill()
+        self._apply_miss_penalty(alien.color)
+**After:**
+    def _apply_shield_bottom_kill(self, alien: Alien) -> None:
+        ...
+        self.audio.play('explosion')
+        self.scores.add_for_color(alien.color)
+        self._try_spawn_powerup_drop(alien)
+        alien.kill()
+
+    def _apply_miss_penalty(self, alien_color: str) -> None:
+        ...
+        if self.laser_level > 1 or self.burst_tier > 0:
+            self.laser_level = 1
+            self.burst_tier = 0
+            self._pending_follow_ups = []
+            return
+
+    def _update_playing(self) -> None:
+        ...
+        if self._shield_is_active():
+            self._apply_shield_bottom_kill(alien)
+            continue
+        alien.kill()
+        self._apply_miss_penalty(alien.color)
+**Why:** Corrects the previous overreach and aligns behavior with intent: when unshielded, a bottom-hit now removes green/yellow combat upgrades (laser + burst) before hearts; when shielded, existing shield-bottom handling remains in place and no shield-loss event/sound is introduced.
+**Editor:** GitHub Copilot GPT-5.3-Codex via VS Code
     _rebuild(): creates a new SRCALPHA surface sized to current cone span; draws 5 trapezoid
                 segments with per-segment hue offsets; updates self.rect to match.
     update(): advances top_y each frame; lifts apex_y once top_y < 0; calls _rebuild(); kills
@@ -2208,4 +2324,38 @@ The cone polygon implementation looked wrong (an isolated triangle floating up r
 **After:**
     - Replace the current normal shield overlay (solid blue) with a smoother fade/transition effect; keep fast end-of-duration flashing behavior.
 **Why:** Captures the requested follow-up polish item so we can revisit a nicer slow-phase shield transition later without losing the decision made for this pass.
+**Editor:** GitHub Copilot GPT-5.3-Codex via VS Code
+
+## 2026-05-07 00:57 UTC — Fix powerup-loss alarm and green tier pickup SFX
+
+**File:** main.py
+**Date and Time:** 2026-05-07 00:57 UTC
+**Lines (at time of edit):** 316-319, 380-384 (modified)
+**Before:**
+    elif powerup.kind == PowerupSettings.LASER_UPGRADE_TYPE:
+        if self.laser_level < PowerupSettings.MAX_LASER_LEVEL:
+            self.laser_level += 1
+            if self.laser_level >= PowerupSettings.MAX_LASER_LEVEL:
+                self.audio.play('hyper')
+            else:
+                self.audio.play('powerup_twin')
+
+    if self.laser_level > 1 or self.burst_tier > 0:
+        self.laser_level = 1
+        self.burst_tier = 0
+        self._pending_follow_ups = []
+        return
+**After:**
+    elif powerup.kind == PowerupSettings.LASER_UPGRADE_TYPE:
+        if self.laser_level < PowerupSettings.MAX_LASER_LEVEL:
+            self.laser_level += 1
+            self.audio.play('powerup_twin')
+
+    if self.laser_level > 1 or self.burst_tier > 0:
+        self.laser_level = 1
+        self.burst_tier = 0
+        self._pending_follow_ups = []
+        self.audio.play('alarm_med')
+        return
+**Why:** Restores expected audio behavior in two places: stripping active powerups on a miss now plays the warning alarm again, and collecting the second green tier (which reaches max laser level) no longer plays hyper and instead uses the regular powerup pickup sound.
 **Editor:** GitHub Copilot GPT-5.3-Codex via VS Code

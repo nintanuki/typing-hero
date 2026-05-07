@@ -316,10 +316,7 @@ class GameManager:
             elif powerup.kind == PowerupSettings.LASER_UPGRADE_TYPE:
                 if self.laser_level < PowerupSettings.MAX_LASER_LEVEL:
                     self.laser_level += 1
-                    if self.laser_level >= PowerupSettings.MAX_LASER_LEVEL:
-                        self.audio.play('hyper')
-                    else:
-                        self.audio.play('powerup_twin')
+                    self.audio.play('powerup_twin')
             elif powerup.kind == PowerupSettings.BURST_TYPE:
                 if self.burst_tier < PowerupSettings.MAX_BURST_TIER:
                     self.burst_tier += 1
@@ -362,17 +359,17 @@ class GameManager:
         """Apply the bottom-hit penalty for a missed alien.
 
         Blue aliens deal no damage — escaping them is a missed score opportunity
-        only.  For other colors, a hit strips the laser upgrade first; once that
-        is gone, hearts are deducted.  Invincibility frames block all damage
-        during the post-hit recovery window.
+        only. Without shield protection, a hit strips laser and burst powerups
+        first; once both are gone, hearts are deducted. Invincibility frames
+        block all damage during the post-hit recovery window.
 
         Args:
             alien_color: The color of the alien that reached the bottom.
         """
-        if self._shield_is_active():
+        if alien_color == 'blue':
             return
 
-        if alien_color == 'blue':
+        if self._shield_is_active():
             return
 
         if pygame.time.get_ticks() < self._invincible_until:
@@ -380,9 +377,11 @@ class GameManager:
 
         self._trigger_damage_flash()
 
-        if self.laser_level > 1:
-            self.audio.play('alarm_med')
+        if self.laser_level > 1 or self.burst_tier > 0:
             self.laser_level = 1
+            self.burst_tier = 0
+            self._pending_follow_ups = []
+            self.audio.play('alarm_med')
             return
 
         self.hearts -= 1
