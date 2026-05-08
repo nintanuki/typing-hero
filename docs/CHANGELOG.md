@@ -1,6 +1,6 @@
 # Change Log
 
-This file is an append-only record of every code change made to Typing Hero by a human, AI assistant, or copilot tool. Read it before making changes so you know the current state of the codebase.
+This file is an append-only record of every code change made to Typing Hero by a human, AI assistant, or copilot tool. Read it before making changes so you know the current state of the codebase. After making changes, append an entry here per the format below — this is a hard requirement, not a suggestion. See [.github/copilot-instructions.md](../.github/copilot-instructions.md) for the full set of post-edit obligations.
 
 ## Format
 
@@ -24,12 +24,13 @@ Both the section header and the per-file `Date and Time` field must use ISO 8601
 
 ## Conventions
 
-* Line numbers reflect the file as it existed at the moment of the edit. Edits above shift line numbers below, so older entries will not match the current file. Never go back and "fix" old line numbers.
-* Entries are append-only. Never delete history. If a later edit reverts an earlier one, write a new entry that references the original.
+* Line numbers reflect the file as it existed at the moment of the edit. Edits above shift line numbers below, so older entries will not match the current file. **Never go back and "fix" old line numbers.**
+* Entries are append-only. **Never delete or rewrite history.** If a later edit reverts an earlier one, write a new entry that references the original.
 * For new files, write `(new file)` instead of a line range. The "Before" block can be omitted or marked `(file did not exist)`.
 * For deletes, write `(deleted)` and put the removed code in "Before" with no "After" block.
 * Keep "Before" / "After" blocks short. If a change is huge, summarize with a diff-style excerpt of the most important lines plus a sentence describing the rest, instead of pasting the entire file.
-* Pre-2026-05-03 entries (from the Star Hero changelog) are preserved in `legacy/docs/CHANGELOG.md` and are not retroactively edited or imported here. Typing Hero's history starts fresh with the entry below.
+* Always include the **Editor** field, identifying both the human or AI model and the interface used (e.g. `Claude Opus 4.7 via Cowork`, `GPT-5 via VS Code Copilot Chat`, `Frankie (manual)`). This makes it possible to audit which sessions produced which changes.
+* Pre-2026-05-03 entries (from the Star Hero changelog) are preserved in `legacy/docs/CHANGELOG.md` and are not retroactively edited or imported here. Typing Hero's history starts fresh with the first entry below.
 
 ---
 
@@ -2359,3 +2360,125 @@ The cone polygon implementation looked wrong (an isolated triangle floating up r
         return
 **Why:** Restores expected audio behavior in two places: stripping active powerups on a miss now plays the warning alarm again, and collecting the second green tier (which reaches max laser level) no longer plays hyper and instead uses the regular powerup pickup sound.
 **Editor:** GitHub Copilot GPT-5.3-Codex via VS Code
+
+---
+
+## 2026-05-08 01:03 UTC — Documentation overhaul (no source changes)
+
+This entry covers a single docs-only pass that brings Typing Hero's contributor documentation up to a professional standard suitable for both human and AI editors. Every change is in `.md` or new top-level config files. **No `.py` files were modified.** The mimic-dice project's documentation set was used as a structural reference; existing CHANGELOG history was left intact.
+
+**File:** .github/copilot-instructions.md
+**Date and Time:** 2026-05-08 01:03 UTC
+**Lines (at time of edit):** 1-end (full rewrite)
+**Before:**
+    [The previous instructions file mixed code-style rules, file-layout rules,
+     UI-text rules, and ad-hoc reminders without a clear "read this before
+     coding" structure or a defined post-edit obligation set.]
+**After:**
+    [Structured rulebook with: required reading order before any change
+     (README → TODO → ARCHITECTURE → TESTING → CHANGELOG → source),
+     required actions after any change (CHANGELOG entry, ARCHITECTURE update,
+     TODO ticking, TESTING smoke pass), code-style rules, architecture rules
+     (GameManager stays thin, no magic numbers outside settings.py), file/
+     function layout including the section-banner template, comments and
+     docstrings, ALL CAPS UI rule, working-with-legacy/ rules, and a mental
+     smoke-test checklist.]
+**Why:** The old instructions file was a flat list of preferences. Weaker AI editors and new contributors couldn't tell which rules were hard requirements vs. soft preferences, what they had to read before editing, or what they had to do after editing. The rewrite makes the contract explicit and enforceable, and consolidates the "Refactoring Rules" block that had been duplicated at the bottom of TESTING.md.
+**Editor:** Claude Opus 4.7 via VS Code Copilot Chat
+
+**File:** docs/ARCHITECTURE.md
+**Date and Time:** 2026-05-08 01:03 UTC
+**Lines (at time of edit):** (new file)
+**Before:** (file did not exist)
+**After:**
+    [Full system-by-system architecture document: shape of program with ASCII
+     diagram, frame loop, word & typing subsystem, spawn director, score/
+     hearts/leaderboard, audio, sprites & animations, HUD & CRT, settings as
+     knob panel, asset pipeline, input model, code conventions, and "what's
+     not here yet" pointing to TODO Phase 4.]
+**Why:** Without an architecture document, every new editor (human or AI) had to reverse-engineer the manager-oriented design from `main.py` outward. This file is the missing map: it explains how `GameManager` coordinates `WordManager`, `SpawnDirector`, `ScoreManager`, and `AudioManager`; how the frame loop works; how each subsystem owns its state; and where the rules live. It is item 3 in the required reading order from copilot-instructions.md.
+**Editor:** Claude Opus 4.7 via VS Code Copilot Chat
+
+**File:** docs/TODO.md
+**Date and Time:** 2026-05-08 01:03 UTC
+**Lines (at time of edit):** 1-end (full rewrite)
+**Before:**
+    [Mixed prose-and-stages format: open design questions interleaved with
+     a "Stage 10 — V2 polish" list, a parking lot, observations, and dev
+     notes. No checkboxes; no clear phase boundaries; status line still
+     said "Stages 0–9 complete" without acknowledging powerups had landed.]
+**After:**
+    [Phase 1–4 structure with [x]/[ ] checkboxes. Phase 1 (scaffolding),
+     Phase 2 (core gameplay loop), and Phase 3 (score/audio/menus + powerups)
+     are marked complete. Phase 4 (V2 polish) split into 4a powerups & status
+     effects, 4b motion & layout, 4c UX & meta, 4d repo housekeeping —
+     explicitly à la carte. Open questions Q6/Q8/Q9/Q11, Known issues,
+     Observations O1–O3, Dev notes, and Documentation maintenance footer
+     all preserved and refined.]
+**Why:** The old format conflated "what's left to build" with "open design questions" and didn't show progress. The new phased structure makes status legible at a glance, gives Phase 4 work a stable home that doesn't pretend to be linear, and matches the reading flow expected by copilot-instructions.md (which now treats TODO as item 2 in the required reading order).
+**Editor:** Claude Opus 4.7 via VS Code Copilot Chat
+
+**File:** docs/TESTING.md
+**Date and Time:** 2026-05-08 01:03 UTC
+**Lines (at time of edit):** 1-end (rewritten + truncated)
+**Before:**
+    [Stages 0–9 smoke tests followed by an embedded "Refactoring Rules" block
+     duplicating coding-style rules. No "how to use this document" intro,
+     no cross-cutting checks section, and no powerup smoke tests despite
+     powerups being implementation-complete.]
+**After:**
+    [How-to-use intro explaining when to run smoke tests and what to do on
+     regression. Cross-cutting checks section (boot, fullscreen, ESC, audio,
+     no magic numbers). Stages 0–9 retained and tightened (uppercase "Typing
+     Hero" window title, removed obsolete Q7 reference, generalized hardcoded
+     timing claims to settings references). New "Powerup smoke tests"
+     section covering heart, shield, laser-tier, burst, rainbow beam, damage
+     flash, and powerup-strip-before-heart behaviors. Phase 4 placeholder
+     points at TODO. Embedded Refactoring Rules block removed — those rules
+     now live solely in copilot-instructions.md as the single source of truth.]
+**Why:** The Refactoring Rules being in two places was a recipe for drift. The rewrite refocuses TESTING.md as a manual smoke-test playbook (its actual job) and adds the cross-cutting checks section that the mental-smoke-test checklist in copilot-instructions.md now references.
+**Editor:** Claude Opus 4.7 via VS Code Copilot Chat
+
+**File:** README.md
+**Date and Time:** 2026-05-08 01:03 UTC
+**Lines (at time of edit):** 1-end (full rewrite)
+**Before:**
+    [Pre-scaffolding README that described Typing Hero as a future project,
+     said "the repository currently contains only documentation and the
+     frozen legacy/ source," and pointed at a planned project layout.]
+**After:**
+    [User-facing manual: about the game, current Phase 4 status line, How
+     to play (with soft-lock targeting + score-by-color callouts), Controls
+     table, Requirements (Python 3.10+, Pygame 2.5+), Install & run
+     (`pip install -r requirements.txt`, `python main.py`), Project layout
+     reflecting the actual current tree, Documentation reading order, Working
+     with legacy/ note, and Credits including Star Hero origin and Clear
+     Code tutorials.]
+**Why:** The old README described a repo that no longer exists. The rewrite serves both audiences the user identified: end users who want to play the game, and "the curious" who want to read the code. It is item 1 in the documentation reading order.
+**Editor:** Claude Opus 4.7 via VS Code Copilot Chat
+
+**File:** requirements.txt
+**Date and Time:** 2026-05-08 01:03 UTC
+**Lines (at time of edit):** (new file)
+**Before:** (file did not exist)
+**After:**
+    pygame>=2.5
+**Why:** README's install instructions reference `pip install -r requirements.txt`. Without this file that line would be a dead reference. Pinned to >=2.5 because that's the floor declared in README's Requirements section.
+**Editor:** Claude Opus 4.7 via VS Code Copilot Chat
+
+**File:** docs/CHANGELOG.md
+**Date and Time:** 2026-05-08 01:03 UTC
+**Lines (at time of edit):** 1-36 (header + Conventions polished); end of file (this entry appended)
+**Before:**
+    [Header said "Read it before making changes so you know the current state
+     of the codebase." Conventions list did not call out the Editor field
+     as required and did not link to copilot-instructions.md.]
+**After:**
+    [Header now also says editors must append an entry after making changes
+     and links to copilot-instructions.md for the full set of post-edit
+     obligations. Conventions list adds an explicit Editor-field requirement
+     and bolds the never-rewrite-history rule. No existing entries below
+     the header were touched.]
+**Why:** The header was passive ("read this") rather than active ("read this *and* append an entry after"). Linking out to copilot-instructions.md keeps this file's conventions section narrow (changelog format) while the broader contributor contract lives in one canonical place.
+**Editor:** Claude Opus 4.7 via VS Code Copilot Chat
+
