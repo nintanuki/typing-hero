@@ -2160,6 +2160,70 @@ The cone polygon implementation looked wrong (an isolated triangle floating up r
     TV = os.path.join(GRAPHICS_DIR, 'tv.png')
     TV_BLUE = os.path.join(GRAPHICS_DIR, 'tv_blue.png')
     TV_RED = os.path.join(GRAPHICS_DIR, 'tv_red.png')
+
+## 2026-05-07 21:20 UTC — Inverted shield pulse to white-base with blue pulse
+
+**File:** settings.py
+**Date and Time:** 2026-05-07 21:20 UTC
+**Lines (at time of edit):** 190-197 (modified)
+**Before:**
+    # Base alpha for the blue vignette layer that's always visible while shielded.
+    FLASH_ALPHA = 200
+    PULSE_PERIOD_MS = 1400
+    PULSE_WHITE_ALPHA_MAX = 200
+**After:**
+    # Base alpha for the white vignette layer that's always visible while shielded.
+    FLASH_ALPHA = 200
+    PULSE_PERIOD_MS = 1400
+    PULSE_BLUE_ALPHA_MAX = 200
+**Why:** The requested visual inversion needs a blue pulse amount, not a white pulse amount. Renaming the constant keeps shield tuning semantics aligned with the compositing direction.
+**Editor:** GPT-5.3-Codex via GitHub Copilot Chat in VS Code
+
+**File:** ui/crt.py
+**Date and Time:** 2026-05-07 21:20 UTC
+**Lines (at time of edit):** 55-72 (modified)
+**Before:**
+    def draw_shield_flash(self, white_alpha: int) -> None:
+        self.tv_blue.set_alpha(ShieldSettings.FLASH_ALPHA)
+        self.screen.blit(self.tv_blue, (0, 0))
+        if white_alpha > 0:
+            self.tv_white.set_alpha(white_alpha)
+            self.screen.blit(self.tv_white, (0, 0))
+**After:**
+    def draw_shield_flash(self, blue_alpha: int) -> None:
+        self.tv_white.set_alpha(ShieldSettings.FLASH_ALPHA)
+        self.screen.blit(self.tv_white, (0, 0))
+        if blue_alpha > 0:
+            self.tv_blue.set_alpha(blue_alpha)
+            self.screen.blit(self.tv_blue, (0, 0))
+**Why:** Inverting the pulse is achieved by swapping the base layer and pulsing layer: white remains constant and blue fades in/out on top.
+**Editor:** GPT-5.3-Codex via GitHub Copilot Chat in VS Code
+
+**File:** main.py
+**Date and Time:** 2026-05-07 21:20 UTC
+**Lines (at time of edit):** 5-7, 705-722 (modified)
+**Before:**
+    import random
+    import sys
+    import math
+
+    strobe_white = (...) != 0
+    white_alpha = ShieldSettings.PULSE_WHITE_ALPHA_MAX if strobe_white else 0
+    ...
+    white_alpha = int(ShieldSettings.PULSE_WHITE_ALPHA_MAX * wave)
+    self.crt.draw_shield_flash(white_alpha)
+**After:**
+    import math
+    import random
+    import sys
+
+    strobe_blue = (...) != 0
+    blue_alpha = ShieldSettings.PULSE_BLUE_ALPHA_MAX if strobe_blue else 0
+    ...
+    blue_alpha = int(ShieldSettings.PULSE_BLUE_ALPHA_MAX * wave)
+    self.crt.draw_shield_flash(blue_alpha)
+**Why:** The renderer now expects blue pulse intensity, so the gameplay draw path computes and passes blue alpha directly in both normal pulse and warning strobe phases.
+**Editor:** GPT-5.3-Codex via GitHub Copilot Chat in VS Code
     TV_WHITE = os.path.join(GRAPHICS_DIR, 'tv_white.png')
 
     HEART_TYPE = 'heal'
@@ -2363,6 +2427,145 @@ The cone polygon implementation looked wrong (an isolated triangle floating up r
 
 ---
 
+## 2026-05-07 21:00 UTC — Shield vignette pulses smoothly between blue and white
+
+Replaced the binary blue/white toggle on the active-shield CRT vignette with a sinusoidal crossfade so the overlay breathes between the two states instead of strobing. The blue vignette is now drawn as a constant base layer; a white vignette is composited on top with an alpha that rides a cosine wave (period configurable via ShieldSettings.PULSE_PERIOD_MS). The rapid-strobe warning during the final WARNING_MS of the shield is preserved by feeding a binary 0 / PULSE_WHITE_ALPHA_MAX alpha through the same path, so the urgency cue still reads as a hard flash.
+
+**File:** settings.py
+**Date and Time:** 2026-05-07 21:00 UTC
+**Lines (at time of edit):** 185-198 (modified)
+**Before:**
+    class ShieldSettings:
+        DURATION_MS = 7000
+        WARNING_MS = 1000
+        FLASH_INTERVAL = 120 # not used until we can make this look nicer?
+        WARNING_FLASH_INTERVAL = 25
+        FLASH_ALPHA = 200
+**After:**
+    class ShieldSettings:
+        DURATION_MS = 7000
+        WARNING_MS = 1000
+        WARNING_FLASH_INTERVAL = 25
+        FLASH_ALPHA = 200
+        PULSE_PERIOD_MS = 1400
+        PULSE_WHITE_ALPHA_MAX = 200
+**Why:** Removed unused FLASH_INTERVAL (the TODO note `not used until we can make this look nicer?` is exactly what this change addresses) and added pulse tunables so the smooth crossfade timing stays out of main.py and crt.py.
+**Editor:** Claude Opus 4.7 via GitHub Copilot Chat in VS Code
+
+**File:** ui/crt.py
+**Date and Time:** 2026-05-07 21:00 UTC
+**Lines (at time of edit):** 55-63 (modified)
+**Before:**
+    def draw_shield_flash(self, show_blue: bool) -> None:
+        overlay = self.tv_blue if show_blue else self.tv_white
+        overlay.set_alpha(ShieldSettings.FLASH_ALPHA)
+        self.screen.blit(overlay, (0, 0))
+**After:**
+    def draw_shield_flash(self, white_alpha: int) -> None:
+        self.tv_blue.set_alpha(ShieldSettings.FLASH_ALPHA)
+        self.screen.blit(self.tv_blue, (0, 0))
+        if white_alpha > 0:
+            self.tv_white.set_alpha(white_alpha)
+            self.screen.blit(self.tv_white, (0, 0))
+**Why:** A bool can only express two end-points, which is why the previous implementation only ever produced a hard alternation. Taking an integer alpha and always layering blue + white lets the same routine express both the smooth pulse and the warning strobe; the CRT layer no longer needs to know which mode the shield is in.
+**Editor:** Claude Opus 4.7 via GitHub Copilot Chat in VS Code
+
+**File:** main.py
+**Date and Time:** 2026-05-07 21:00 UTC
+**Lines (at time of edit):** 5-7 (modified import block); 703-722 (modified shield draw block)
+**Before:**
+    if shield_time_left <= ShieldSettings.WARNING_MS:
+        show_blue = (
+            (shield_time_left // ShieldSettings.WARNING_FLASH_INTERVAL) % 2
+        ) == 0
+    else:
+        show_blue = True
+    self.crt.draw_shield_flash(show_blue)
+**After:**
+    if shield_time_left <= ShieldSettings.WARNING_MS:
+        strobe_white = (
+            (shield_time_left // ShieldSettings.WARNING_FLASH_INTERVAL) % 2
+        ) != 0
+        white_alpha = ShieldSettings.PULSE_WHITE_ALPHA_MAX if strobe_white else 0
+    else:
+        phase = (
+            (pygame.time.get_ticks() % ShieldSettings.PULSE_PERIOD_MS)
+            / ShieldSettings.PULSE_PERIOD_MS
+        )
+        wave = (1 - math.cos(phase * 2 * math.pi)) / 2
+        white_alpha = int(ShieldSettings.PULSE_WHITE_ALPHA_MAX * wave)
+    self.crt.draw_shield_flash(white_alpha)
+**Why:** Used a raised cosine ((1 - cos(2π·phase)) / 2) because it eases through 0 and 1 cleanly — a triangle wave or abs(sin) produced visible "corners" at the extremes of the fade in test runs. Added `import math` to support it; kept the warning-strobe arithmetic identical so the end-of-shield warning reads the same as before.
+**Editor:** Claude Opus 4.7 via GitHub Copilot Chat in VS Code
+
+---
+
+## 2026-05-07 21:20 UTC — Inverted shield pulse to white-base with blue pulse
+
+**File:** settings.py
+**Date and Time:** 2026-05-07 21:20 UTC
+**Lines (at time of edit):** 190-197 (modified)
+**Before:**
+    # Base alpha for the blue vignette layer that's always visible while shielded.
+    FLASH_ALPHA = 200
+    PULSE_PERIOD_MS = 1400
+    PULSE_WHITE_ALPHA_MAX = 200
+**After:**
+    # Base alpha for the white vignette layer that's always visible while shielded.
+    FLASH_ALPHA = 200
+    PULSE_PERIOD_MS = 1400
+    PULSE_BLUE_ALPHA_MAX = 200
+**Why:** The requested visual inversion needs a blue pulse amount, not a white pulse amount. Renaming the constant keeps shield tuning semantics aligned with the compositing direction.
+**Editor:** GPT-5.3-Codex via GitHub Copilot Chat in VS Code
+
+**File:** ui/crt.py
+**Date and Time:** 2026-05-07 21:20 UTC
+**Lines (at time of edit):** 55-72 (modified)
+**Before:**
+    def draw_shield_flash(self, white_alpha: int) -> None:
+        self.tv_blue.set_alpha(ShieldSettings.FLASH_ALPHA)
+        self.screen.blit(self.tv_blue, (0, 0))
+        if white_alpha > 0:
+            self.tv_white.set_alpha(white_alpha)
+            self.screen.blit(self.tv_white, (0, 0))
+**After:**
+    def draw_shield_flash(self, blue_alpha: int) -> None:
+        self.tv_white.set_alpha(ShieldSettings.FLASH_ALPHA)
+        self.screen.blit(self.tv_white, (0, 0))
+        if blue_alpha > 0:
+            self.tv_blue.set_alpha(blue_alpha)
+            self.screen.blit(self.tv_blue, (0, 0))
+**Why:** Inverting the pulse is achieved by swapping the base layer and pulsing layer: white remains constant and blue fades in/out on top.
+**Editor:** GPT-5.3-Codex via GitHub Copilot Chat in VS Code
+
+**File:** main.py
+**Date and Time:** 2026-05-07 21:20 UTC
+**Lines (at time of edit):** 5-7, 705-722 (modified)
+**Before:**
+    import random
+    import sys
+    import math
+
+    strobe_white = (...) != 0
+    white_alpha = ShieldSettings.PULSE_WHITE_ALPHA_MAX if strobe_white else 0
+    ...
+    white_alpha = int(ShieldSettings.PULSE_WHITE_ALPHA_MAX * wave)
+    self.crt.draw_shield_flash(white_alpha)
+**After:**
+    import math
+    import random
+    import sys
+
+    strobe_blue = (...) != 0
+    blue_alpha = ShieldSettings.PULSE_BLUE_ALPHA_MAX if strobe_blue else 0
+    ...
+    blue_alpha = int(ShieldSettings.PULSE_BLUE_ALPHA_MAX * wave)
+    self.crt.draw_shield_flash(blue_alpha)
+**Why:** The renderer now expects blue pulse intensity, so the gameplay draw path computes and passes blue alpha directly in both normal pulse and warning strobe phases.
+**Editor:** GPT-5.3-Codex via GitHub Copilot Chat in VS Code
+
+---
+
 ## 2026-05-08 01:03 UTC — Documentation overhaul (no source changes)
 
 This entry covers a single docs-only pass that brings Typing Hero's contributor documentation up to a professional standard suitable for both human and AI editors. Every change is in `.md` or new top-level config files. **No `.py` files were modified.** The mimic-dice project's documentation set was used as a structural reference; existing CHANGELOG history was left intact.
@@ -2481,4 +2684,77 @@ This entry covers a single docs-only pass that brings Typing Hero's contributor 
      the header were touched.]
 **Why:** The header was passive ("read this") rather than active ("read this *and* append an entry after"). Linking out to copilot-instructions.md keeps this file's conventions section narrow (changelog format) while the broader contributor contract lives in one canonical place.
 **Editor:** Claude Opus 4.7 via VS Code Copilot Chat
+
+---
+
+## 2026-05-08 01:13 UTC — Sync docs with shield pulse changes (merge resolution)
+
+The documentation overhaul above was authored against an older `main` that did not yet include the 21:00 / 21:20 shield-pulse rework on `origin/main`. Pulling the remote produced a CHANGELOG conflict and left several doc references describing the old binary-toggle shield. This entry covers the resolution: both 21:00 and 21:20 changelog entries were preserved verbatim and reordered chronologically before the doc-overhaul entry, and three documentation files were updated to describe the new white-base / blue-pulse compositing. **No `.py` files were touched.**
+
+**File:** docs/CHANGELOG.md
+**Date and Time:** 2026-05-08 01:13 UTC
+**Lines (at time of edit):** ~2430-2687 (conflict region resolved)
+**Before:**
+    [Conflict markers <<<<<<< HEAD / ======= / >>>>>>> fd4af50 wrapping the
+     doc-overhaul entry on one side and the two shield-pulse entries on the
+     other.]
+**After:**
+    [Conflict markers removed. Order is chronological: the 21:00 UTC
+     "Shield vignette pulses smoothly..." entry, the 21:20 UTC "Inverted
+     shield pulse..." entry, then the 01:03 UTC "Documentation overhaul"
+     entry. Both shield entries are preserved verbatim from origin/main.]
+**Why:** Append-only history is sacred; rather than picking one side of the conflict, the resolution keeps every entry that landed on either branch, in the order the work actually happened.
+**Editor:** Claude Opus 4.7 via VS Code Copilot Chat
+
+**File:** docs/TESTING.md
+**Date and Time:** 2026-05-08 01:13 UTC
+**Lines (at time of edit):** ~147 (Powerup smoke tests, Shield drop bullet)
+**Before:**
+    * **Shield drop** (red alien) — drops only when no shield is active; on
+      bottom contact, the shield activates for `ShieldSettings.DURATION_MS`,
+      the blue vignette pulses, and bottom-of-screen alien hits become
+      shielded kills (explosion + score, no heart cost).
+**After:**
+    * **Shield drop** (red alien) — ... constant white wash with a blue
+      overlay smoothly cosine-pulsing in and out on top (period
+      `ShieldSettings.PULSE_PERIOD_MS`, peak alpha `PULSE_BLUE_ALPHA_MAX`).
+      During the final `ShieldSettings.WARNING_MS` ms the smooth pulse
+      switches to a rapid binary blue strobe driven by
+      `WARNING_FLASH_INTERVAL`. ...
+**Why:** The smoke test described the pre-pulse behavior. A QA reading this would mark a passing build as a regression. Updated to match the white-base + blue-pulse compositing and call out both the smooth and warning-strobe modes by their settings names.
+**Editor:** Claude Opus 4.7 via VS Code Copilot Chat
+
+**File:** docs/ARCHITECTURE.md
+**Date and Time:** 2026-05-08 01:13 UTC
+**Lines (at time of edit):** ~190 (HUD & CRT section, draw_shield_flash bullet)
+**Before:**
+    - **`draw_shield_flash(show_blue)`** — similar, using `tv_blue.png`.
+      Driven by the shield powerup's remaining-time countdown so the flash
+      visibly speeds up as the shield is about to expire.
+**After:**
+    - **`draw_shield_flash(blue_alpha)`** — composites the blue vignette on
+      top of the white one. The white layer is always blitted at
+      `ShieldSettings.FLASH_ALPHA`; the caller passes a blue alpha (0–255)
+      for the layer on top. `GameManager` drives that alpha two ways:
+      a smooth `(1 - cos(2π·phase)) / 2` crossfade with period
+      `ShieldSettings.PULSE_PERIOD_MS` for the bulk of the shield window,
+      and a rapid binary strobe in the final `WARNING_MS` ms ...
+**Why:** The architecture document was advertising a stale signature (`show_blue: bool`). Updated to match the current `blue_alpha: int` API and explain how `GameManager` drives both pulse modes through the same code path.
+**Editor:** Claude Opus 4.7 via VS Code Copilot Chat
+
+**File:** docs/TODO.md
+**Date and Time:** 2026-05-08 01:13 UTC
+**Lines (at time of edit):** ~57 (Phase 4c, smoother-shield item)
+**Before:**
+    - [ ] Smoother shield overlay (gradient/fade) instead of solid blue;
+      preserve fast end-of-duration flash.
+**After:**
+    - [x] Smoother shield overlay (gradient/fade) instead of solid blue;
+      preserve fast end-of-duration flash. *(Cosine crossfade between white
+      base and blue pulse; binary strobe preserved in the final
+      `ShieldSettings.WARNING_MS` window. See CHANGELOG entries 2026-05-07
+      21:00 UTC and 21:20 UTC.)*
+**Why:** This Phase 4c item shipped on `origin/main` while the doc-overhaul branch was being written. Marked complete with a pointer to the implementing changelog entries instead of deleting it (per "do not delete — leave as a record" in the documentation maintenance footer).
+**Editor:** Claude Opus 4.7 via VS Code Copilot Chat
+
 

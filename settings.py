@@ -187,9 +187,14 @@ class ShieldSettings:
 
     DURATION_MS = 7000
     WARNING_MS = 1000
-    FLASH_INTERVAL = 120 # not used until we can make this look nicer?
     WARNING_FLASH_INTERVAL = 25
+    # Base alpha for the white vignette layer that's always visible while shielded.
     FLASH_ALPHA = 200
+    # Sinusoidal crossfade between white and blue. PULSE_PERIOD_MS controls
+    # how long one full white->blue->white cycle takes; PULSE_BLUE_ALPHA_MAX
+    # caps how blue the wash gets at the peak of the pulse.
+    PULSE_PERIOD_MS = 1000
+    PULSE_BLUE_ALPHA_MAX = 200
 
 
 class LaserSettings:

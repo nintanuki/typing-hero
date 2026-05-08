@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import random
 import sys
 from typing import Literal
@@ -703,12 +704,22 @@ class GameManager:
         if self.state == 'playing' and self._shield_is_active():
             shield_time_left = self._shield_until - pygame.time.get_ticks()
             if shield_time_left <= ShieldSettings.WARNING_MS:
-                show_blue = (
+                # Rapid binary strobe near expiry to warn the player the
+                # shield is about to drop.
+                strobe_blue = (
                     (shield_time_left // ShieldSettings.WARNING_FLASH_INTERVAL) % 2
-                ) == 0
+                ) != 0
+                blue_alpha = ShieldSettings.PULSE_BLUE_ALPHA_MAX if strobe_blue else 0
             else:
-                show_blue = True
-            self.crt.draw_shield_flash(show_blue)
+                # Smooth sine crossfade between white (alpha=0) and blue
+                # (alpha=PULSE_BLUE_ALPHA_MAX) over PULSE_PERIOD_MS.
+                phase = (
+                    (pygame.time.get_ticks() % ShieldSettings.PULSE_PERIOD_MS)
+                    / ShieldSettings.PULSE_PERIOD_MS
+                )
+                wave = (1 - math.cos(phase * 2 * math.pi)) / 2
+                blue_alpha = int(ShieldSettings.PULSE_BLUE_ALPHA_MAX * wave)
+            self.crt.draw_shield_flash(blue_alpha)
 
         # Damage flash is drawn after the CRT so it sits on top of everything.
         # It's separate from crt.draw() so a future CRT-disable toggle won't hide it.

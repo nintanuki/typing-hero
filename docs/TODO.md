@@ -54,7 +54,7 @@ This file tracks work in **phases**. Each phase has a clear goal; finish a phase
 - [ ] Re-theme music if `star_hero.ogg` no longer fits.
 - [ ] Custom typing-themed sprites (letter-themed enemies?).
 - [ ] Move initials row up a bit, or leaderboard down — current layout has a stray blue line.
-- [ ] Smoother shield overlay (gradient/fade) instead of solid blue; preserve fast end-of-duration flash.
+- [x] Smoother shield overlay (gradient/fade) instead of solid blue; preserve fast end-of-duration flash. *(Cosine crossfade between white base and blue pulse; binary strobe preserved in the final `ShieldSettings.WARNING_MS` window. See CHANGELOG entries 2026-05-07 21:00 UTC and 21:20 UTC.)*
 - [ ] Optional manual target cycling as accessibility fallback for soft-lock ambiguity in dense waves (off by default).
 
 ### 4d. Repo housekeeping

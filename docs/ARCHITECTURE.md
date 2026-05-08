@@ -187,7 +187,7 @@ All five render only their own ALL-CAPS text — they take render data through t
 It also exposes two single-blit helpers for transient gameplay vignettes:
 
 - **`draw_damage_flash(show_red)`** — alternates `tv_red.png` and `tv_white.png` while the post-hit flash window is active. Drawn **after** the CRT overlay and explicitly outside `draw()` so a future "disable CRT" toggle cannot accidentally suppress damage feedback.
-- **`draw_shield_flash(show_blue)`** — similar, using `tv_blue.png`. Driven by the shield powerup's remaining-time countdown so the flash visibly speeds up as the shield is about to expire.
+- **`draw_shield_flash(blue_alpha)`** — composites the blue vignette on top of the white one. The white layer is always blitted at `ShieldSettings.FLASH_ALPHA`; the caller passes a blue alpha (0–255) for the layer on top. `GameManager` drives that alpha two ways: a smooth `(1 - cos(2π·phase)) / 2` crossfade with period `ShieldSettings.PULSE_PERIOD_MS` for the bulk of the shield window, and a rapid binary strobe in the final `WARNING_MS` ms so the impending expiry reads as urgent. The CRT layer doesn't know which mode it's in — it just blits whatever alpha it's handed.
 
 ---
 
